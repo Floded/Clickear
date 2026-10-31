@@ -4,6 +4,49 @@ Este documento sirve como contexto, especificación de arquitectura y prompt de 
 
 ---
 
+## Documentación del Proyecto
+
+| Documento | Contenido |
+|---|---|
+| [`docs/api.md`](docs/api.md) | Catálogo de endpoints con ejemplos de request/response |
+| [`docs/decisiones.md`](docs/decisiones.md) | Decisiones arquitectónicas (ADRs ligeros) y su porqué |
+| [`docs/fases.md`](docs/fases.md) | Estado del roadmap por fase |
+
+## Quickstart (desarrollo)
+
+```bash
+# 1. Dependencias
+npm install
+
+# 2. Infraestructura (Postgres 16 en :5433, Redis 7 en :6379)
+docker compose up -d
+
+# 3. Migraciones (crea las tablas en la BD)
+npx prisma migrate dev
+
+# 4. Servidor de desarrollo (tsx watch, recarga automática)
+npm run dev
+# → Server http://localhost:3000  |  health: GET /api/health
+
+# Verificación rápida
+curl http://localhost:3000/api/health
+```
+
+Variables de entorno: copiar `.env.example` → `.env` (ya incluye la DATABASE_URL del compose).
+
+```bash
+# Otros comandos útiles
+npm run typecheck   # type checking estricto
+npm run db:studio   # GUI de la base de datos → :5555
+npm run build       # compilar a dist/ para producción
+```
+
+> **Nota (macOS con PostgreSQL nativo):** si tenés un Postgres local (ej. la app
+> "PostgreSQL 17") ocupando el 5432, el container de este proyecto mapea al
+> **5433** para coexistir — ver `docs/decisiones.md` (DEC-002).
+
+---
+
 ## 1. Visión General del Sistema
 
 El sistema es una plataforma web para la gestión integral de operaciones en campo, que abarca:
