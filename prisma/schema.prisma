@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// MÓDULO 1: DESPACHO Y TICKETS DE SOPORTE
+// ==========================================
+
+model DispatchOrder {
+  id                Int      @id @default(autoincrement())
+  dispatchCode      String   @map("dispatch_code") @db.VarChar(50)
+  dispatchTimestamp DateTime @map("dispatch_timestamp")
+  listStatus        String   @map("list_status") @db.VarChar(50)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  establishments    Establishment[]
+  technicians       DispatchTechnician[]
+
+  @@map("dispatch_orders")
+}
+
+model Establishment {
+  cue                  String   @id @db.VarChar(20)
+  dispatchOrderId      Int?     @map("dispatch_order_id")
+  name                 String   @db.VarChar(255)
+  department           String?  @db.VarChar(100)
+  locality             String?  @db.VarChar(100)
+  address              String?  @db.Text
+  phone                String?  @db.VarChar(50)
+  distanceKm           Decimal? @map("distance_km") @db.Decimal(6, 2)
+  directorName         String?  @map("director_name") @db.VarChar(255)
+  isSecondaryBuilding  Boolean  @map("is_secondary_building") @default(false)
+
+  dispatchOrder DispatchOrder? @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+  tickets       Ticket[]
+
+  @@map("establishments")
+}
+
+model Technician {
+  id       Int    @id @default(autoincrement())
+  fullName String @map("full_name") @db.VarChar(255)
+
+  dispatchOrders DispatchTechnician[]
+
+  @@map("technicians")
+}
+
+// Relación N:M entre órdenes y técnicos
+model DispatchTechnician {
+  dispatchOrderId Int @map("dispatch_order_id")
+  technicianId    Int @map("technician_id")
+
+  dispatchOrder DispatchOrder @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+  technician    Technician    @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@id([dispatchOrderId, technicianId])
+  @@map("dispatch_technicians")
+}
+
+model Ticket {
+  ticketId         BigInt    @id @map("ticket_id")
+  establishmentCue String?   @map("establishment_cue") @db.VarChar(20)
+  title            String    @db.Text
+  glpiClosedTicket String?   @map("glpi_closed_ticket") @db.VarChar(100)
+  openingTimestamp DateTime? @map("opening_timestamp") @db.Timestamp()
+  status           String    @default("ABIERTO") @db.VarChar(50)
+
+  establishment Establishment? @relation(fields: [establishmentCue], references: [cue], onDelete: Cascade)
+  invoices      Invoice[]
+
+  @@map("tickets")
+}
+
+// ==========================================
+// MÓDULO 2: INVENTARIO Y STOCK
+// ==========================================
+
+model Supplier {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(255)
+  contactPhone String?  @map("contact_phone") @db.VarChar(50)
+  contactEmail String?  @map("contact_email") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  inventoryItems InventoryItem[]
+
+  @@map("suppliers")
+}
+
+model Employee {
+  id                Int      @id @default(autoincrement())
+  fullName          String   @map("full_name") @db.VarChar(255)
+  dniOrFileNumber   String   @unique @map("dni_or_file_number") @db.VarChar(50)
+  phone             String?  @db.VarChar(50)
+  isActive          Boolean  @map("is_active") @default(true)
+
+  assignments ItemAssignment[]
+
+  @@map("employees")
+}
+
+model InventoryItem {
+  id                Int      @id @default(autoincrement())
+  supplierId        Int?     @map("supplier_id")
+  name              String   @db.VarChar(255)
+  description       String?  @db.Text
+  availableQuantity Int      @map("available_quantity") @default(0)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  supplier    Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  assignments ItemAssignment[] @relation("ItemAssignments")
+
+  @@map("inventory_items")
+}
+
+model ItemAssignment {
+  id               Int       @id @default(autoincrement())
+  inventoryItemId  Int       @map("inventory_item_id")
+  employeeId       Int       @map("employee_id")
+  quantityAssigned Int       @map("quantity_assigned")
+  deliveryDate     DateTime  @map("delivery_date") @db.Timestamp()
+  returnDate       DateTime? @map("return_date") @db.Timestamp()
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp()
+
+  inventoryItem InventoryItem @relation("ItemAssignments", fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@map("item_assignments")
+}
+
+// ==========================================
+// MÓDULO 3: FACTURACIÓN ARCA (PREPARACIÓN)
+// ==========================================
+
+model Invoice {
+  id                Int       @id @default(autoincrement())
+  ticketId          BigInt?   @map("ticket_id")
+  voucherType       Int       @map("voucher_type")
+  docType           Int       @map("doc_type")
+  docNumber         String    @map("doc_number") @db.VarChar(20)
+  amount            Decimal   @db.Decimal(12, 2)
+  cae               String?   @db.VarChar(50)
+  caeExpirationDate DateTime? @map("cae_expiration_date") @db.Date()
+  status            String    @default("PENDING") @db.VarChar(50)
+  errorMessage      String?   @map("error_message") @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp()
+
+  ticket Ticket? @relation(fields: [ticketId], references: [ticketId], onDelete: SetNull)
+
+  @@map("invoices")
+}
