@@ -1,6 +1,25 @@
+# Dependencias
 node_modules/
+
+# Builds y cachés
 dist/
 coverage/
+*.tsbuildinfo
+
+# Entornos (nunca subir secretos — .env.example queda versionado)
 .env
+.env.local
+.env.*.local
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE / sistema
 .DS_Store
+.vscode/
+.idea/
+Thumbs.db
