@@ -4,7 +4,11 @@ import cors from "cors";
 import express, { type Express } from "express";
 
 import { dispatchOrderRouter, technicianRouter } from "./modules/dispatch/dispatch.routes.js";
+import { assignmentRouter } from "./modules/assignments/assignment.routes.js";
+import { employeeRouter } from "./modules/employees/employee.routes.js";
 import { establishmentRouter } from "./modules/establishments/establishment.routes.js";
+import { inventoryItemRouter } from "./modules/inventory/inventory-item.routes.js";
+import { supplierRouter } from "./modules/suppliers/supplier.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
@@ -24,6 +28,10 @@ export function createApp(): Express {
   app.use("/api/dispatch-orders", dispatchOrderRouter);
   app.use("/api/technicians", technicianRouter);
   app.use("/api/tickets", ticketRouter);
+  app.use("/api/suppliers", supplierRouter);
+  app.use("/api/employees", employeeRouter);
+  app.use("/api/inventory-items", inventoryItemRouter);
+  app.use("/api/assignments", assignmentRouter);
 
   app.use(errorHandler);
 

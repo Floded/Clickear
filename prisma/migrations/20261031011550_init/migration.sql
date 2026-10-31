@@ -26,7 +26,7 @@ CREATE TABLE "establishments" (
 );
 
 -- CreateTable
-CREATE TABLE "technicians" (
+CREATE TABLE "technicians" 
     "id" SERIAL NOT NULL,
     "full_name" VARCHAR(255) NOT NULL,
 
