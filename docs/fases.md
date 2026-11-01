@@ -34,29 +34,39 @@ se actualiza al cierre de cada fase.
 
 ---
 
-## Fase 3 — Backend Módulo Inventario y Stock ⬜ (próxima)
+## Fase 3 ✅ — Backend Módulo Inventario y Stock
 
-- [ ] CRUD de Proveedores (`suppliers`) y Empleados (`employees`).
-- [ ] CRUD de Ítems de Stock (`inventory_items`) con proveedor (set null en baja).
-- [ ] Transacción de asignación `POST /api/assignments`:
+- [x] CRUD de Proveedores (`suppliers`) y Empleados (`employees`).
+- [x] CRUD de Ítems de Stock (`inventory_items`) con proveedor (set null en baja).
+- [x] Transacción de asignación `POST /api/assignments`:
   - Validar disponibilidad (`available_quantity` sin quedar negativo).
   - `delivery_date` obligatorio, `return_date` opcional.
   - Resta atómica de `available_quantity`.
-- [ ] `GET /api/employees/:id/assignments` — stock en custodia por empleado.
-- [ ] Devolución (`PUT /api/assignments/:id/return`) — re-suma al depósito.
+- [x] `GET /api/employees/:id/assignments` — stock en custodia por empleado.
+- [x] Devolución (`PUT /api/assignments/:id/return`) — re-suma al depósito.
+
+**Extras:** ajuste diferencial de stock (`PATCH /inventory-items/:id/stock`),
+listado global de asignaciones (`GET /api/assignments`), campo `website` en
+`suppliers` (migración `20261101044805_add_supplier_website`).
 
 ---
 
-## Fase 4 — Frontend (Interfaz Web) ⬜ (diferida — decidido en sesión de plan)
+## Fase 4 ✅ — Frontend (Interfaz Web)
 
-- [ ] Dashboard principal con navegación Tickets / Stock.
-- [ ] Lista de Tickets con buscador, filtros y tarjetas resumen.
-- [ ] Modal/detalle de Ticket.
-- [ ] Panel de Stock: tabla depósito, modal de asignación y vista "haber" del empleado.
+Implementado por completo en el repo `Frontend/` (ver su
+[`README.md`](../Frontend/README.md) para el detalle por etapa):
+
+- Layout con sidebar + health del backend, React Router, TanStack Query.
+- Tickets: listado por establecimiento, filtros, detalle, alta y cambio de estado.
+- Inventario: stock con bajo stock, custodia por empleado, asignar material,
+  ajuste de stock y devoluciones.
+- Facturación: tabla de comprobantes con badges de estado (emisión real pendiente).
+- **Proveedores**: alta y listado en `/inventory/suppliers` con búsqueda y
+  paginación; hover card con teléfono/email/web desde el tab de stock.
 
 ---
 
-## Fase 5 — Integración ARCA (ex-AFIP) ⬜ (solo esquema preparado — DEC-006)
+## Fase 5 ⬜ — Integración ARCA (ex-AFIP) — solo esquema preparado (DEC-006)
 
 - [ ] Cola BullMQ + Redis para comprobantes asíncronos.
 - [ ] Cliente WSAA/WSFE (requiere credenciales reales del negocio).

@@ -129,6 +129,7 @@ CREATE TABLE suppliers (
     name VARCHAR(255) NOT NULL,
     contact_phone VARCHAR(50),
     contact_email VARCHAR(255),
+    website VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -214,7 +214,50 @@ curl -X PATCH http://localhost:3000/api/tickets/125691/status \
 
 ---
 
-## Próximos módulos (en roadmap)
+## Proveedores (`/api/suppliers`)
 
-- **Fase 3 (Stock)**: `suppliers`, `employees`, `inventory_items`, `POST /api/assignments` con transacción atómica de resta de stock, y `GET /api/employees/:id/assignments` (custodia).
-- **Fase 5 (ARCA)**: cola BullMQ + worker que emite comprobantes y actualiza `invoices`.
+| Método | Descripción | Body |
+|---|---|---|
+| `GET` | Listado paginado, filtro `search` (nombre o email). Incluye `_count.inventoryItems` | — |
+| `GET /:id` | Detalle con `inventoryItems` asociadas | — |
+| `POST` | Alta | `{"name": "Distribuidora Sur", "contactPhone": "221-555-1234", "contactEmail": "ventas@dsur.com.ar", "website": "https://dsur.com.ar"}` → `201` |
+| `PATCH /:id` | Modificación parcial (mismos campos, todos opcionales) | parcial del alta |
+| `DELETE /:id` | Baja (`204`). Los ítems asociados quedan sin proveedor (`SET NULL`) | — |
+
+`contactEmail` debe ser un email válido y `website` una URL válida (validación Zod).
+
+## Empleados (`/api/employees`)
+
+| Método | Descripción | Body |
+|---|---|---|
+| `GET` | Listado paginado, filtros `search` y `isActive` | — |
+| `GET /:id` | Detalle | — |
+| `POST` | Alta | `{"fullName": "María González", "dniOrFileNumber": "12345678", "phone": "…", "isActive": true}` → `201` |
+| `PATCH /:id` | Modificación parcial | parcial del alta |
+| `DELETE /:id` | Baja lógica (`isActive: false`); `409` si tiene historial de asignaciones | — |
+| `GET /:id/assignments` | Stock en custodia: `unitsInCustody` + asignaciones (activas y devueltas) | — |
+
+## Ítems de Inventario (`/api/inventory-items`)
+
+| Método | Descripción | Body |
+|---|---|---|
+| `GET` | Listado paginado, filtros `search`, `supplierId`, `hasStock`. Incluye `supplier` y `_count.assignments` | — |
+| `GET /:id` | Detalle | — |
+| `POST` | Alta | `{"name": "Cable HDMI 2m", "description": "…", "supplierId": 1, "availableQuantity": 10}` → `201` |
+| `PATCH /:id` | Modificación parcial (no toca `availableQuantity`) | parcial del alta |
+| `DELETE /:id` | Baja (`409` si tiene asignaciones) | — |
+| `PATCH /:id/stock` | Ajuste diferencial de stock (entero, negativo para merma) | `{"quantity": -3}` |
+
+## Asignaciones (`/api/assignments`)
+
+| Método | Descripción | Body |
+|---|---|---|
+| `GET` | Listado paginado, filtros `status` (`ACTIVE`/`RETURNED`), `employeeId`, `inventoryItemId` | — |
+| `POST` | Asignación transaccional (`409` si no hay stock suficiente) | `{"inventoryItemId": 1, "employeeId": 2, "quantityAssigned": 2, "deliveryDate": "2026-11-01", "notes": "…"}` → `201` |
+| `PUT /:id/return` | Devolución total o parcial con re-stock atómico | `{"quantity": 1, "returnDate": "2026-11-05", "notes": "…"}` |
+
+---
+
+## Pendiente en el roadmap
+
+- **Fase 5 (ARCA)**: cola BullMQ + worker que emite comprobantes y actualiza `invoices` (requiere credenciales WSAA/WSFE reales).
