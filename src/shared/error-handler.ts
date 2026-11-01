@@ -32,6 +32,18 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
+  // Violación de FK: restricción de borrado (Restrict) o dato referenciado inexistente
+  if (err instanceof Prisma.PrismaClientKnownRequestError && (err.code === "P2003" || err.code === "P2014")) {
+    const field = (err.meta as { field?: string[] | string } | undefined)?.field;
+    const target = Array.isArray(field) ? field.join(", ") : field;
+    res.status(409).json({
+      error: target
+        ? `No se puede completar la operación sobre '${target}': tiene registros relacionados`
+        : "No se puede completar la operación: tiene registros relacionados",
+    });
+    return;
+  }
+
   console.error("[error]", err);
   res.status(500).json({ error: "Error interno del servidor" });
 };

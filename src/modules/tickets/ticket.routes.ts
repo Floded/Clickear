@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  assignTicketSchema,
   createTicketSchema,
   listTicketsQuerySchema,
   ticketIdParamsSchema,
@@ -30,4 +31,11 @@ ticketRouter.patch("/:id/status", async (req, res) => {
   const { id } = ticketIdParamsSchema.parse(req.params);
   const { status } = updateTicketStatusSchema.parse(req.body);
   res.json(await ticketService.updateStatus(id, status));
+});
+
+// Asigna (employeeId > 0), reasigna o libera (employeeId null) el ticket
+ticketRouter.patch("/:id/assignment", async (req, res) => {
+  const { id } = ticketIdParamsSchema.parse(req.params);
+  const input = assignTicketSchema.parse(req.body);
+  res.json(await ticketService.assign(id, input));
 });

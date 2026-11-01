@@ -36,7 +36,9 @@ model Establishment {
   directorName         String?  @map("director_name") @db.VarChar(255)
   isSecondaryBuilding  Boolean  @map("is_secondary_building") @default(false)
 
-  dispatchOrder DispatchOrder? @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+  // SetNull: al borrar una orden de despacho el establecimiento del catálogo
+  // sobrevive y queda disponible para otra orden
+  dispatchOrder DispatchOrder? @relation(fields: [dispatchOrderId], references: [id], onDelete: SetNull)
   tickets       Ticket[]
 
   @@map("establishments")
@@ -64,17 +66,38 @@ model DispatchTechnician {
 }
 
 model Ticket {
-  ticketId         BigInt    @id @map("ticket_id")
-  establishmentCue String?   @map("establishment_cue") @db.VarChar(20)
-  title            String    @db.Text
-  glpiClosedTicket String?   @map("glpi_closed_ticket") @db.VarChar(100)
-  openingTimestamp DateTime? @map("opening_timestamp") @db.Timestamp()
-  status           String    @default("ABIERTO") @db.VarChar(50)
+  ticketId           BigInt    @id @map("ticket_id")
+  establishmentCue   String?   @map("establishment_cue") @db.VarChar(20)
+  assignedEmployeeId Int?      @map("assigned_employee_id")
+  title              String    @db.Text
+  glpiClosedTicket   String?   @map("glpi_closed_ticket") @db.VarChar(100)
+  openingTimestamp   DateTime? @map("opening_timestamp") @db.Timestamp()
+  status             String    @default("ABIERTO") @db.VarChar(50)
 
-  establishment Establishment? @relation(fields: [establishmentCue], references: [cue], onDelete: Cascade)
-  invoices      Invoice[]
+  // Restrict: no se borra un empleado que tenga historial de tickets
+  assignedEmployee Employee? @relation(fields: [assignedEmployeeId], references: [id], onDelete: Restrict)
+  establishment    Establishment? @relation(fields: [establishmentCue], references: [cue], onDelete: Restrict)
+  assignments      TicketAssignment[]
+  invoices         Invoice[]
 
+  @@index([assignedEmployeeId])
   @@map("tickets")
+}
+
+// Historial de asignación de tickets a empleados (una fila activa por ticket)
+model TicketAssignment {
+  id         Int       @id @default(autoincrement())
+  ticketId   BigInt    @map("ticket_id")
+  employeeId Int       @map("employee_id")
+  assignedAt DateTime  @default(now()) @map("assigned_at") @db.Timestamp()
+  releasedAt DateTime? @map("released_at") @db.Timestamp()
+
+  ticket   Ticket   @relation(fields: [ticketId], references: [ticketId], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@index([employeeId])
+  @@map("ticket_assignments")
 }
 
 // ==========================================
@@ -101,7 +124,9 @@ model Employee {
   phone             String?  @db.VarChar(50)
   isActive          Boolean  @map("is_active") @default(true)
 
-  assignments ItemAssignment[]
+  assignments       ItemAssignment[]
+  assignedTickets   Ticket[]
+  ticketAssignments TicketAssignment[]
 
   @@map("employees")
 }
