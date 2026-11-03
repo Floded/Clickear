@@ -8,6 +8,21 @@ datasource db {
 }
 
 // ==========================================
+// ACCESO
+// ==========================================
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  @@map("users")
+}
+
+// ==========================================
 // MÓDULO 1: DESPACHO Y TICKETS DE SOPORTE
 // ==========================================
 

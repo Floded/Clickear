@@ -17,6 +17,12 @@ export class NotFoundError extends HttpError {
   }
 }
 
+export class UnauthorizedError extends HttpError {
+  constructor(message = "No autorizado") {
+    super(401, message);
+  }
+}
+
 export class ConflictError extends HttpError {
   constructor(message = "Conflicto con el estado actual del recurso") {
     super(409, message);

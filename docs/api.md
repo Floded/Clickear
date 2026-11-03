@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:3000`
 
-Todas las rutas (salvo `GET /` y `GET /api/health`) viven bajo `/api`.
+Todas las rutas (salvo `GET /`, `GET /api/health` y `POST /api/auth/*`) viven bajo `/api` y **requieren sesión** (ver [Autenticación](#autenticación)).
 
 ---
 
@@ -35,6 +35,7 @@ Todos los listados aceptan `page` (default `1`) y `limit` (default `20`, máx `1
 | `400` | Body JSON malformado | `{"error":"JSON invalido en el cuerpo de la peticion"}` |
 | `400` | Validación Zod | `{"error":"Datos invalidos","details":[{"field":"status","message":"Invalid enum value..."}]}` |
 | `404` | Recurso inexistente | `{"error":"Ticket 999999 not found"}` |
+| `401` | Sin sesión o credenciales inválidas | `{"error":"Credenciales incorrectas"}` |
 | `409` | Clave única duplicada | `{"error":"Valor duplicado","field":["cue"]}` |
 | `500` | Error no controlado | `{"error":"Error interno del servidor"}` |
 
@@ -58,6 +59,35 @@ Todos los listados aceptan `page` (default `1`) y `limit` (default `20`, máx `1
 curl http://localhost:3000/api/health
 # {"status":"ok"}
 ```
+
+---
+
+## Autenticación
+
+La sesión se maneja con un **JWT en cookie `httpOnly`** (7 días, `SameSite=Lax`). No hay header `Authorization`: el backend lee la cookie automáticamente y las respuestas con credenciales usan `credentials: true` en CORS.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/auth/login` | Inicia sesión y setea la cookie de sesión |
+| `POST` | `/api/auth/logout` | Borra la cookie de sesión |
+| `GET` | `/api/auth/me` | Devuelve el usuario de la sesión actual |
+
+```bash
+# Login (ok -> {"user":{...}} + Set-Cookie: auth_token=...; HttpOnly; SameSite=Lax)
+curl -i -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@clickear.local","password":"..."}'
+
+# Sesión actual (401 si no hay cookie válida)
+curl -b cookies.txt http://localhost:3000/api/auth/me
+
+# Logout
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:3000/api/auth/logout
+```
+
+Errores: `400` si el body no valida, `401` con mensaje genérico `"Credenciales incorrectas"` si el email o la contraseña no coinciden (no se distingue cuál falló).
+
+El usuario inicial se crea con `npm run db:seed` usando `ADMIN_EMAIL` / `ADMIN_PASSWORD` del `.env`.
 
 ---
 
