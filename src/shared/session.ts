@@ -1,5 +1,10 @@
 import jwt from "jsonwebtoken";
 
+import type { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+
+export const prisma = new PrismaClient();
+
 export const COOKIE_NAME = "auth_token";
 
 // Sesión larga: 7 días por defecto, configurable en segundos vía .env
@@ -42,3 +47,31 @@ export const sessionCookieOptions = {
   path: "/",
   maxAge: EXPIRES_IN_SECONDS * 1000,
 };
+
+// Logging de intentos de autenticación (SOC 2: auditoría)
+export async function logAuthAttempt(
+  req: Request,
+  token?: string,
+  success: boolean = false,
+  errorCode?: string
+) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user?.sub ? Number(req.user.sub) : null,
+        action: success ? "login_success" : "login_failure",
+        resource: "auth",
+        details: {
+          ip: req.ip,
+          userAgent: req.get("User-Agent"),
+          ...(token && { token: token.substring(0, 10) + "..." }),
+          errorCode,
+        },
+        timestamp: new Date(),
+      },
+    });
+  } catch (e) {
+    // No bloquear la operación si falla el logging
+    console.warn("Failed to log auth attempt:", e);
+  }
+}

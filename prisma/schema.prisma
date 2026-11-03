@@ -239,3 +239,14 @@ model BudgetLine {
 
   @@map("budget_lines")
 }
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?     @map("user_id")
+  action     String   @map("action") @db.VarChar(100)
+  resource   String?  @map("resource")
+  details    Json?    @map("details")
+  timestamp  DateTime @default(now()) @map("timestamp") @db.Timestamp()
+
+  @@map("audit_logs")
+}

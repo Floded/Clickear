@@ -1,5 +1,8 @@
 import "./shared/json-bigint.js";
 
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { requestIdMiddleware } from "./shared/request-id.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { type Express } from "express";
@@ -24,6 +27,41 @@ const allowedOrigins = (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173")
 
 export function createApp(): Express {
   const app = express();
+
+  // Request ID for audit trails (SOC 2: unique identification per request)
+  app.use(requestIdMiddleware);
+
+  // Security headers (SOC 2 / ISO 27001)
+  app.use(
+    helmet.contentSecurityPolicy({
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        frameSrc: ["'none'"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    })
+  );
+
+  // Additional Helmet middlewares (solo los que no sobreescribimos CSP)
+  app.use(helmet.referrerPolicy({ policy: "strict-origin-when-cross-origin" }));
+  app.use(helmet.frameguard({ action: "deny" }));
+  app.use(helmet.hsts({ maxAge: 31536000, includeSubDomains: true, preload: true }));
+  app.use(helmet.xssFilter());
+  app.use(helmet.noSniff());
+
+  // Rate limiting to prevent brute-force (SOC 2 CC6.1, CC6.2)
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // límite por IP en la ventana de tiempo
+    standardHeaders: true, // headers RateLimit- remaining/reset
+    legacyHeaders: false,
+  });
+  app.use("/api/", limiter);
 
   app.use(cors({ origin: allowedOrigins, credentials: true }));
   app.use(cookieParser());
