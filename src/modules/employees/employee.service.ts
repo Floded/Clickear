@@ -15,8 +15,11 @@ import type {
 export const employeeService = {
   async list(query: ListEmployeesQuery): Promise<PaginatedResult<Employee>> {
     const where: Prisma.EmployeeWhereInput = {
-      fullName: query.search
-        ? { contains: query.search, mode: "insensitive" }
+      OR: query.search
+        ? [
+            { fullName: { contains: query.search, mode: "insensitive" } },
+            { dniOrFileNumber: { contains: query.search, mode: "insensitive" } },
+          ]
         : undefined,
       isActive: query.isActive === undefined ? undefined : query.isActive === "true",
     };

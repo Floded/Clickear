@@ -12,6 +12,7 @@ import { supplierRouter } from "./modules/suppliers/supplier.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
+import { budgetRouter } from "./modules/budgets/budget.routes.js";
 
 export function createApp(): Express {
   const app = express();
@@ -32,6 +33,7 @@ export function createApp(): Express {
   app.use("/api/employees", employeeRouter);
   app.use("/api/inventory-items", inventoryItemRouter);
   app.use("/api/assignments", assignmentRouter);
+  app.use("/api/budgets", budgetRouter);
 
   app.use(errorHandler);
 
