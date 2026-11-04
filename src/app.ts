@@ -44,7 +44,7 @@ export function createApp(): Express {
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", "https://clickear.onrender.com"],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [],
       },
