@@ -1,8 +1,7 @@
 # Dependencias
 node_modules/
 
-# Builds y cachés
-dist/
+# Builds y cachés (solo carpetas generadas localmente, Render compila y sube)
 coverage/
 *.tsbuildinfo
 
