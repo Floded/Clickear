@@ -32,6 +32,11 @@ export function createApp(): Express {
   // Esto permite que express-rate-limit identifique correctamente las IPs de los clientes
   app.set("trust proxy", 1);
 
+  //!Borrar luego
+  console.log("=================================");
+console.log("TRUST PROXY:", app.get("trust proxy"));
+console.log("=================================");
+
   // Request ID for audit trails (SOC 2: unique identification per request)
   app.use(requestIdMiddleware);
 
@@ -65,6 +70,9 @@ export function createApp(): Express {
     standardHeaders: true, // headers RateLimit- remaining/reset
     legacyHeaders: false,
   });
+//! BORRAR
+console.log("RATE LIMITER CONFIGURADO");
+
   app.use("/api/", limiter);
 
   app.use(cors({ origin: allowedOrigins, credentials: true }));
