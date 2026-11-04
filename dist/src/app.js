@@ -23,6 +23,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173")
     .map((origin) => origin.trim());
 export function createApp() {
     const app = express();
+    // Configuración para Render: Render usa un proxy inverso que añade el header X-Forwarded-For
+    // Esto permite que express-rate-limit identifique correctamente las IPs de los clientes
+    app.set("trust proxy", 1);
     // Request ID for audit trails (SOC 2: unique identification per request)
     app.use(requestIdMiddleware);
     // Security headers (SOC 2 / ISO 27001)
