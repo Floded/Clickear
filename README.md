@@ -47,6 +47,40 @@ npm run build       # compilar a dist/ para producción
 
 ---
 
+## Entornos (local vs producción)
+
+El backend decide qué archivo de entorno cargar en `src/env.ts` según `NODE_ENV`:
+
+| Entorno | `NODE_ENV` | Archivo | Base de datos |
+|---|---|---|---|
+| Local (desarrollo) | `development` | `.env` | Docker → `localhost:5433` |
+| Local estilo producción | `production` | `.env.production` | el que defina ese archivo |
+| Producción (Render) | `production` | *no carga ninguno* | variables del **dashboard de Render** |
+
+Reglas:
+
+- `dotenv` **nunca pisa variables ya existentes**: en Render siempre ganan las del dashboard.
+- Los archivos `.env` y `.env.production` están en `.gitignore` (suben los secretos solo por el dashboard).
+- Tras editar un `.env`, **reiniciar el servidor**: `tsx watch` no detecta cambios en `.env`.
+- Seed del admin local: `npm run db:seed` → `admin@clickear.local` / `Admin123!` (solo local).
+
+```bash
+# Probar el backend en modo producción en tu máquina
+NODE_ENV=production npx tsx src/server.ts
+```
+
+---
+
+## Testing
+
+> **Regla obligatoria:** después de cada cambio o modificación en el código del Backend se deben crear o ejecutar los tests correspondientes antes de dar el cambio por terminado. Esto aplica también al agente de código.
+
+- Todo cambio de comportamiento (lógica, servicios, rutas/middleware, validaciones) debe acompañarse de su test.
+- Nunca se da por finalizada una modificación sin correr la suite de tests y que pase en verde.
+- Si el cambio rompe un test existente, se actualiza el test solo si el nuevo comportamiento es el esperado.
+
+---
+
 ## 1. Visión General del Sistema
 
 El sistema es una plataforma web para la gestión integral de operaciones en campo, que abarca:
