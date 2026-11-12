@@ -19,6 +19,7 @@ import { authenticate } from "./shared/authenticate.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { budgetRouter } from "./modules/budgets/budget.routes.js";
+import { uploadsStaticDir } from "./modules/tickets/ticket-image.storage.js";
 
 // Orígenes permitidos para CORS (las cookies requieren un origen explícito)
 const allowedOrigins = (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173")
@@ -82,6 +83,9 @@ console.log("RATE LIMITER CONFIGURADO");
   app.get("/", (_req, res) => {
     res.json({ name: "clickear-backend", status: "ok" });
   });
+
+  // Archivos de tickets (imagenes de cierre); publico porque el nombre es aleatorio
+  app.use("/uploads", express.static(uploadsStaticDir, { maxAge: "1d" }));
 
   app.use("/api", healthRouter);
   app.use("/api/auth", authRouter);

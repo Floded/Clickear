@@ -95,6 +95,7 @@ model Ticket {
   establishment    Establishment? @relation(fields: [establishmentCue], references: [cue], onDelete: Restrict)
   assignments      TicketAssignment[]
   invoices         Invoice[]
+  images           TicketImage[]
 
   @@index([assignedEmployeeId])
   @@map("tickets")
@@ -114,6 +115,21 @@ model TicketAssignment {
   @@index([ticketId])
   @@index([employeeId])
   @@map("ticket_assignments")
+}
+
+// Imágenes adjuntas al ticket como evidencia de cierre
+model TicketImage {
+  id        Int      @id @default(autoincrement())
+  ticketId  BigInt   @map("ticket_id")
+  fileName  String   @map("file_name") @db.VarChar(255)
+  mimeType  String   @map("mime_type") @db.VarChar(50)
+  sizeBytes Int      @map("size_bytes")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  ticket Ticket @relation(fields: [ticketId], references: [ticketId], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_images")
 }
 
 // ==========================================

@@ -158,7 +158,7 @@ describe("Tickets CRUD", () => {
     expect(res.body.status).toBe("EN PROGRESO");
   });
 
-  it("PATCH /:id/status TERMINADO → 200", async () => {
+  it("PATCH /:id/status TERMINADO → 200 (con imagen de cierre)", async () => {
     await seedEstablishment();
     const ticket = await prisma.ticket.create({
       data: {
@@ -166,6 +166,14 @@ describe("Tickets CRUD", () => {
         establishmentCue: "CUE-TICKET-01",
         title: "Ticket terminado",
         status: "ABIERTO",
+      },
+    });
+    await prisma.ticketImage.create({
+      data: {
+        ticketId: ticket.ticketId,
+        fileName: "cierre.png",
+        mimeType: "image/png",
+        sizeBytes: 100,
       },
     });
 
@@ -204,6 +212,112 @@ describe("Tickets CRUD", () => {
       .send({ status: "INEXISTENTE" });
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe("Tickets transiciones de estado", () => {
+  async function seedStatusTicket(ticketId: bigint, status: string) {
+    await seedEstablishment();
+    return prisma.ticket.create({
+      data: {
+        ticketId,
+        establishmentCue: "CUE-TICKET-01",
+        title: `Ticket ${ticketId}`,
+        status,
+      },
+    });
+  }
+
+  async function seedClosingImage(ticketId: bigint) {
+    return prisma.ticketImage.create({
+      data: {
+        ticketId,
+        fileName: `cierre-${ticketId}.png`,
+        mimeType: "image/png",
+        sizeBytes: 100,
+      },
+    });
+  }
+
+  const patchStatus = (ticketId: bigint, status: string) =>
+    supertest(app)
+      .patch(`${baseUrl}/${ticketId}/status`)
+      .set("Cookie", authHeader)
+      .send({ status });
+
+  it("ABIERTO → TERMINADO sin imagen → 400", async () => {
+    const ticket = await seedStatusTicket(8001n, "ABIERTO");
+
+    const res = await patchStatus(ticket.ticketId, "TERMINADO");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("sin imagenes");
+  });
+
+  it("ABIERTO → TERMINADO con imagen → 200", async () => {
+    const ticket = await seedStatusTicket(8002n, "ABIERTO");
+    await seedClosingImage(ticket.ticketId);
+
+    const res = await patchStatus(ticket.ticketId, "TERMINADO");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("TERMINADO");
+  });
+
+  it("ABIERTO → REABIERTO → 400 (transición inválida)", async () => {
+    const ticket = await seedStatusTicket(8003n, "ABIERTO");
+
+    const res = await patchStatus(ticket.ticketId, "REABIERTO");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Transicion de estado invalida");
+  });
+
+  it("EN PROGRESO → ABIERTO → 400", async () => {
+    const ticket = await seedStatusTicket(8004n, "EN PROGRESO");
+
+    const res = await patchStatus(ticket.ticketId, "ABIERTO");
+
+    expect(res.status).toBe(400);
+  });
+
+  it("TERMINADO → REABIERTO → 200 y conserva las imagenes", async () => {
+    const ticket = await seedStatusTicket(8005n, "TERMINADO");
+    await seedClosingImage(ticket.ticketId);
+
+    const res = await patchStatus(ticket.ticketId, "REABIERTO");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("REABIERTO");
+    expect(await prisma.ticketImage.count({ where: { ticketId: ticket.ticketId } })).toBe(1);
+  });
+
+  it("REABIERTO → TERMINADO con la imagen previa (sin nuevas) → 200", async () => {
+    const ticket = await seedStatusTicket(8006n, "REABIERTO");
+    await seedClosingImage(ticket.ticketId);
+
+    const res = await patchStatus(ticket.ticketId, "TERMINADO");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("TERMINADO");
+  });
+
+  it("REABIERTO → EN PROGRESO → 200", async () => {
+    const ticket = await seedStatusTicket(8007n, "REABIERTO");
+
+    const res = await patchStatus(ticket.ticketId, "EN PROGRESO");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("EN PROGRESO");
+  });
+
+  it("mismo estado → 200 (idempotente)", async () => {
+    const ticket = await seedStatusTicket(8008n, "ABIERTO");
+
+    const res = await patchStatus(ticket.ticketId, "ABIERTO");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ABIERTO");
   });
 });
 

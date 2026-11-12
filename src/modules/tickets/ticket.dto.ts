@@ -10,7 +10,12 @@ const ticketEstablishmentSchema = establishmentFieldsSchema
   .omit({ dispatchOrderId: true, isSecondaryBuilding: true })
   .extend({ name: z.string().trim().min(2).max(255).optional() });
 
-export const TICKET_STATUSES = ["ABIERTO", "EN PROGRESO", "TERMINADO"] as const;
+export const TICKET_STATUSES = [
+  "ABIERTO",
+  "EN PROGRESO",
+  "TERMINADO",
+  "REABIERTO",
+] as const;
 
 export const ticketStatusSchema = z.enum(TICKET_STATUSES);
 
@@ -46,6 +51,11 @@ export const assignTicketSchema = z.object({
 
 export const ticketIdParamsSchema = z.object({
   id: z.coerce.bigint(),
+});
+
+export const ticketImageParamsSchema = z.object({
+  id: z.coerce.bigint(),
+  imageId: z.coerce.number().int().positive(),
 });
 
 export type TicketStatus = z.infer<typeof ticketStatusSchema>;

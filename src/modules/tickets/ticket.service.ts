@@ -1,7 +1,11 @@
 import { Prisma, type Ticket } from "@prisma/client";
 
 import { prisma } from "../../prisma/client.js";
-import { ConflictError, NotFoundError } from "../../shared/http-error.js";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../../shared/http-error.js";
 import {
   toPaginatedResult,
   type PaginatedResult,
@@ -13,6 +17,14 @@ import type {
   TicketEstablishmentInput,
   TicketStatus,
 } from "./ticket.dto.js";
+
+// Transiciones de estado permitidas (sin auto-transicion: el mismo estado es no-op)
+const ALLOWED_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
+  ABIERTO: ["EN PROGRESO", "TERMINADO"],
+  "EN PROGRESO": ["TERMINADO"],
+  TERMINADO: ["REABIERTO"],
+  REABIERTO: ["EN PROGRESO", "TERMINADO"],
+};
 
 export interface TicketListFilters {
   status?: TicketStatus;
@@ -109,6 +121,8 @@ export const ticketService = {
             createdAt: true,
           },
         },
+        // Evidencia de cierre, para la sección de imágenes del detalle
+        images: { orderBy: { createdAt: "asc" } },
       },
     });
 
@@ -140,6 +154,35 @@ export const ticketService = {
 
   async updateStatus(ticketId: bigint, status: TicketStatus): Promise<Ticket> {
     await assertTicketExists(ticketId);
+
+    const current = await prisma.ticket.findUnique({
+      where: { ticketId },
+      select: { status: true },
+    });
+    const from = current?.status as TicketStatus | undefined;
+
+    // Reenviar el mismo estado es un no-op (idempotente)
+    if (from === status) {
+      return prisma.ticket.findUniqueOrThrow({ where: { ticketId } });
+    }
+
+    if (!from || !ALLOWED_TRANSITIONS[from].includes(status)) {
+      throw new BadRequestError(
+        `Transicion de estado invalida: '${from}' -> '${status}'`,
+      );
+    }
+
+    // El cierre exige evidencia: al reabrir no se borran las imagenes,
+    // por lo que re-cerrar cuenta con las que ya tenga el ticket
+    if (status === "TERMINADO") {
+      const imageCount = await prisma.ticketImage.count({ where: { ticketId } });
+      if (imageCount === 0) {
+        throw new BadRequestError(
+          "No se puede cerrar un ticket sin imagenes de cierre",
+        );
+      }
+    }
+
     return prisma.ticket.update({ where: { ticketId }, data: { status } });
   },
 
