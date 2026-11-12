@@ -1,6 +1,7 @@
 import { Prisma, type ItemAssignment } from "@prisma/client";
 
 import { prisma } from "../../prisma/client.js";
+import { formatDate } from "../../shared/excel.js";
 import {
   ConflictError,
   NotFoundError,
@@ -52,16 +53,7 @@ export const assignmentService = {
   },
 
   async list(query: ListAssignmentsQuery): Promise<PaginatedResult<ItemAssignment>> {
-    const where: Prisma.ItemAssignmentWhereInput = {
-      employeeId: query.employeeId,
-      inventoryItemId: query.inventoryItemId,
-      returnDate:
-        query.status === "ACTIVE"
-          ? null
-          : query.status === "RETURNED"
-            ? { not: null }
-            : undefined,
-    };
+    const where = buildAssignmentWhere(query);
 
     const [items, total] = await prisma.$transaction([
       prisma.itemAssignment.findMany({
@@ -75,6 +67,39 @@ export const assignmentService = {
     ]);
 
     return toPaginatedResult(items, total, query);
+  },
+
+  /**
+   * Asignaciones para exportación: mismas condiciones de filtro que list()
+   * pero sin paginación. Devuelve filas ya formateadas para el Excel.
+   */
+  async exportRows(
+    query: ListAssignmentsQuery,
+  ): Promise<(string | number | null)[][]> {
+    const assignments = await prisma.itemAssignment.findMany({
+      where: buildAssignmentWhere(query),
+      orderBy: { deliveryDate: "desc" },
+      include: {
+        inventoryItem: {
+          select: {
+            name: true,
+            supplier: { select: { name: true } },
+          },
+        },
+        employee: { select: { fullName: true } },
+      },
+    });
+
+    return assignments.map((assignment) => [
+      assignment.inventoryItem.name,
+      assignment.inventoryItem.supplier?.name ?? null,
+      assignment.employee.fullName,
+      assignment.quantityAssigned,
+      formatDate(assignment.deliveryDate),
+      formatDate(assignment.returnDate),
+      assignment.returnDate === null ? "ACTIVE" : "RETURNED",
+      assignment.notes ?? null,
+    ]);
   },
 
   /**
@@ -203,6 +228,21 @@ export const assignmentService = {
     });
   },
 };
+
+function buildAssignmentWhere(
+  query: ListAssignmentsQuery,
+): Prisma.ItemAssignmentWhereInput {
+  return {
+    employeeId: query.employeeId,
+    inventoryItemId: query.inventoryItemId,
+    returnDate:
+      query.status === "ACTIVE"
+        ? null
+        : query.status === "RETURNED"
+          ? { not: null }
+          : undefined,
+  };
+}
 
 async function assertEmployeeExists(employeeId: number): Promise<void> {
   const found = await prisma.employee.count({ where: { id: employeeId } });
