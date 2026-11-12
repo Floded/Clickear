@@ -297,6 +297,10 @@ function buildTicketWhere(query: ListTicketsQuery): Prisma.TicketWhereInput {
           },
         }
       : undefined,
+    openingTimestamp: {
+      gte: query.from,
+      lte: query.to,
+    },
   };
 }
 

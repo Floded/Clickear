@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { Response } from "express";
+import type { Response } from "superagent";
 import { afterEach, afterAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -57,9 +57,12 @@ async function seedData() {
   return { supplier, item, employee };
 }
 
-async function readSheet(buffer: Buffer) {
+async function readSheet(buffer: Uint8Array) {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  // exceljs declara su propio Buffer global; tipamos al parámetro de load
+  await workbook.xlsx.load(
+    buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+  );
   const sheet = workbook.getWorksheet("Asignaciones");
   expect(sheet).toBeDefined();
   return sheet as ExcelJS.Worksheet;
@@ -141,5 +144,33 @@ describe("GET /api/assignments/export", () => {
     const sheet = await readSheet(res.body);
 
     expect(sheet.rowCount).toBe(1);
+  });
+
+  it("respeta el rango de fechas de entrega", async () => {
+    const { item, employee } = await seedData();
+    await prisma.itemAssignment.create({
+      data: {
+        inventoryItemId: item.id,
+        employeeId: employee.id,
+        quantityAssigned: 1,
+        deliveryDate: new Date("2026-06-10T12:00:00Z"),
+      },
+    });
+    await prisma.itemAssignment.create({
+      data: {
+        inventoryItemId: item.id,
+        employeeId: employee.id,
+        quantityAssigned: 1,
+        deliveryDate: new Date("2026-02-01T12:00:00Z"),
+      },
+    });
+
+    const res = await getExport(
+      `${baseUrl}?from=${encodeURIComponent("2026-06-01T00:00:00.000Z")}` +
+        `&to=${encodeURIComponent("2026-06-30T23:59:59.999Z")}`,
+    );
+    const sheet = await readSheet(res.body);
+
+    expect(sheet.rowCount).toBe(2); // header + 1
   });
 });

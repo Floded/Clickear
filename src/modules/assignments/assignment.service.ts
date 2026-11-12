@@ -241,6 +241,10 @@ function buildAssignmentWhere(
         : query.status === "RETURNED"
           ? { not: null }
           : undefined,
+    deliveryDate: {
+      gte: query.from,
+      lte: query.to,
+    },
   };
 }
 
