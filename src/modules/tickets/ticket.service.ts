@@ -1,6 +1,7 @@
 import { Prisma, type Ticket } from "@prisma/client";
 
 import { prisma } from "../../prisma/client.js";
+import { formatDateTime } from "../../shared/excel.js";
 import {
   BadRequestError,
   ConflictError,
@@ -41,26 +42,7 @@ const assignedEmployeeSelect = {
 
 export const ticketService = {
   async list(query: ListTicketsQuery): Promise<PaginatedResult<Ticket>> {
-    const where: Prisma.TicketWhereInput = {
-      status: query.status,
-      establishmentCue: query.establishment || undefined,
-      assignedEmployeeId:
-        query.employeeId === "none"
-          ? null
-          : typeof query.employeeId === "number"
-            ? query.employeeId
-            : undefined,
-      title: query.search
-        ? { contains: query.search, mode: "insensitive" }
-        : undefined,
-      establishment: query.technicianId
-        ? {
-            dispatchOrder: {
-              technicians: { some: { technicianId: query.technicianId } },
-            },
-          }
-        : undefined,
-    };
+    const where = buildTicketWhere(query);
 
     const [items, total] = await prisma.$transaction([
       prisma.ticket.findMany({
@@ -85,6 +67,40 @@ export const ticketService = {
     ]);
 
     return toPaginatedResult(items, total, query);
+  },
+
+  /**
+   * Tickets para exportación: mismas condiciones de filtro que list() pero sin
+   * paginación. Devuelve filas ya formateadas (BigInt → string, fechas → texto)
+   * para que la ruta solo tenga que armar la hoja de Excel.
+   */
+  async exportRows(
+    query: ListTicketsQuery,
+  ): Promise<(string | number | null)[][]> {
+    const tickets = await prisma.ticket.findMany({
+      where: buildTicketWhere(query),
+      orderBy: { openingTimestamp: { sort: "desc", nulls: "last" } },
+      include: {
+        assignedEmployee: assignedEmployeeSelect,
+        establishment: {
+          select: { cue: true, name: true, department: true, locality: true },
+        },
+      },
+    });
+
+    return tickets.map((ticket) => [
+      ticket.ticketId.toString(),
+      ticket.title,
+      ticket.status,
+      ticket.glpiClosedTicket,
+      ticket.establishment?.cue ?? null,
+      ticket.establishment?.name ?? null,
+      ticket.establishment?.department ?? null,
+      ticket.establishment?.locality ?? null,
+      ticket.assignedEmployee?.fullName ?? null,
+      ticket.assignedEmployee?.isActive ? "Sí" : "No",
+      formatDateTime(ticket.openingTimestamp),
+    ]);
   },
 
   // Detalle completo: establecimiento, orden de despacho, asignaciones y facturas
@@ -260,6 +276,29 @@ export const ticketService = {
     });
   },
 };
+
+function buildTicketWhere(query: ListTicketsQuery): Prisma.TicketWhereInput {
+  return {
+    status: query.status,
+    establishmentCue: query.establishment || undefined,
+    assignedEmployeeId:
+      query.employeeId === "none"
+        ? null
+        : typeof query.employeeId === "number"
+          ? query.employeeId
+          : undefined,
+    title: query.search
+      ? { contains: query.search, mode: "insensitive" }
+      : undefined,
+    establishment: query.technicianId
+      ? {
+          dispatchOrder: {
+            technicians: { some: { technicianId: query.technicianId } },
+          },
+        }
+      : undefined,
+  };
+}
 
 async function assertTicketExists(ticketId: bigint): Promise<void> {
   const found = await prisma.ticket.count({ where: { ticketId } });
