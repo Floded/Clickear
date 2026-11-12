@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { Response } from "express";
+import type { Response } from "superagent";
 import { afterEach, afterAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -53,6 +53,7 @@ async function seedTicket(input: {
   status?: string;
   establishmentCue?: string;
   employeeId?: number;
+  opening?: Date;
 }) {
   return prisma.ticket.create({
     data: {
@@ -61,13 +62,17 @@ async function seedTicket(input: {
       status: input.status,
       establishmentCue: input.establishmentCue,
       assignedEmployeeId: input.employeeId,
+      openingTimestamp: input.opening,
     },
   });
 }
 
-async function readSheet(buffer: Buffer) {
+async function readSheet(buffer: Uint8Array) {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  // exceljs declara su propio Buffer global; tipamos al parámetro de load
+  await workbook.xlsx.load(
+    buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+  );
   const sheet = workbook.getWorksheet("Tickets");
   expect(sheet).toBeDefined();
   return sheet as ExcelJS.Worksheet;
@@ -155,5 +160,37 @@ describe("GET /api/tickets/export", () => {
 
     expect(sheet.rowCount).toBe(1);
     expect(sheet.getRow(1).getCell(2).value).toBe("Título");
+  });
+
+  it("respeta el rango de fechas de apertura", async () => {
+    await seedTicket({
+      ticketId: BigInt(400),
+      title: "En rango",
+      opening: new Date("2026-06-15T10:00:00Z"),
+    });
+    await seedTicket({
+      ticketId: BigInt(401),
+      title: "Fuera de rango",
+      opening: new Date("2026-01-05T10:00:00Z"),
+    });
+
+    const res = await getExport(
+      `${baseUrl}?from=${encodeURIComponent("2026-06-01T00:00:00.000Z")}` +
+        `&to=${encodeURIComponent("2026-06-30T23:59:59.999Z")}`,
+    );
+    const sheet = await readSheet(res.body);
+
+    expect(sheet.rowCount).toBe(2); // header + 1
+    expect(sheet.getRow(2).getCell(1).value).toBe("400");
+  });
+
+  it("sin rango exporta tickets con y sin fecha de apertura", async () => {
+    await seedTicket({ ticketId: BigInt(500), title: "Con fecha", opening: new Date() });
+    await seedTicket({ ticketId: BigInt(501), title: "Sin fecha" });
+
+    const res = await getExport(baseUrl);
+    const sheet = await readSheet(res.body);
+
+    expect(sheet.rowCount).toBe(3);
   });
 });

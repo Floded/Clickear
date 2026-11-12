@@ -53,3 +53,9 @@
 - [ ] Configurar cliente de integración con ARCA (vía biblioteca WebServices WSAA/WSFE o API wrapper).
 - [ ] Crear Job Worker que tome comprobantes en estado `PENDING`, solicite CAE a ARCA y actualice `invoices`.
 - [ ] Conectar la acción de facturar en el frontend con la cola de emisión.
+
+## 5. Extras fuera del roadmap original
+
+### Exportaciones a Excel
+- [x] Exportación de tickets (`GET /api/tickets/export`) y asignaciones de inventario (`GET /api/assignments/export`). → `shared/excel.ts` con exceljs; protegidos por auth, sin paginación, con los filtros del listado. Mergeada a `dev`.
+- [ ] Rango de fechas (`from` / `to`) en ambas exportaciones: tickets por `openingTimestamp`, asignaciones por `deliveryDate`. Inclusive hasta fin del día.
