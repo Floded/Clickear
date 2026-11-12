@@ -119,6 +119,17 @@ describe("Tickets CRUD", () => {
     expect(res.body.status).toBe("ABIERTO");
   });
 
+  it("POST / con status TERMINADO → 400 (el cierre exige el flujo con imágenes)", async () => {
+    const res = await supertest(app)
+      .post(baseUrl)
+      .set("Cookie", authHeader)
+      .send({ ticketId: 3003, title: "Nace terminado", status: "TERMINADO" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Datos invalidos");
+    expect(res.body.details[0].field).toBe("status");
+  });
+
   it("POST / body inválido (Zod) → 400 con detalles", async () => {
     const res = await supertest(app)
       .post(baseUrl)

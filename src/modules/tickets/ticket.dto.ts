@@ -19,6 +19,10 @@ export const TICKET_STATUSES = [
 
 export const ticketStatusSchema = z.enum(TICKET_STATUSES);
 
+// Un ticket nuevo no puede nacer TERMINADO: el cierre se hace por el flujo
+// de finalización que exige imágenes de evidencia
+export const createTicketStatusSchema = z.enum(["ABIERTO", "EN PROGRESO"]);
+
 export const createTicketSchema = z.object({
   ticketId: z.coerce.bigint().positive(),
   establishmentCue: z.string().trim().max(20).optional(),
@@ -26,7 +30,7 @@ export const createTicketSchema = z.object({
   title: z.string().trim().min(1),
   glpiClosedTicket: z.string().trim().max(100).optional(),
   openingTimestamp: z.coerce.date().optional(),
-  status: ticketStatusSchema.optional(),
+  status: createTicketStatusSchema.optional(),
 });
 
 export const listTicketsQuerySchema = paginationQuerySchema.extend({
