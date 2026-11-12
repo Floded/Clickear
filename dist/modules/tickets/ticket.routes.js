@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { assignTicketSchema, createTicketSchema, listTicketsQuerySchema, ticketIdParamsSchema, updateTicketStatusSchema, } from "./ticket.dto.js";
+import { assignTicketSchema, createTicketSchema, listTicketsQuerySchema, ticketIdParamsSchema, ticketImageParamsSchema, updateTicketStatusSchema, } from "./ticket.dto.js";
+import { ticketImageService } from "./ticket-image.service.js";
+import { handleUploadError, MAX_IMAGES_PER_TICKET, ticketImageUpload, } from "./ticket-image.storage.js";
+import { BadRequestError } from "../../shared/http-error.js";
 import { ticketService } from "./ticket.service.js";
 export const ticketRouter = Router();
 ticketRouter.get("/", async (req, res) => {
@@ -25,5 +28,27 @@ ticketRouter.patch("/:id/assignment", async (req, res) => {
     const { id } = ticketIdParamsSchema.parse(req.params);
     const input = assignTicketSchema.parse(req.body);
     res.json(await ticketService.assign(id, input));
+});
+// Imágenes de cierre del ticket (multipart, campo "images")
+ticketRouter.post("/:id/images", ticketImageUpload.array("images", MAX_IMAGES_PER_TICKET), handleUploadError, async (req, res) => {
+    const { id } = ticketIdParamsSchema.parse(req.params);
+    const files = req.files ?? [];
+    if (files.length === 0) {
+        throw new BadRequestError("Envie al menos una imagen en el campo 'images'");
+    }
+    res.status(201).json(await ticketImageService.add(id, files.map((file) => ({
+        fileName: file.filename,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+    }))));
+});
+ticketRouter.get("/:id/images", async (req, res) => {
+    const { id } = ticketIdParamsSchema.parse(req.params);
+    res.json(await ticketImageService.list(id));
+});
+ticketRouter.delete("/:id/images/:imageId", async (req, res) => {
+    const { id, imageId } = ticketImageParamsSchema.parse(req.params);
+    await ticketImageService.remove(id, imageId);
+    res.status(204).end();
 });
 //# sourceMappingURL=ticket.routes.js.map

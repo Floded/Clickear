@@ -1,6 +1,13 @@
 import { prisma } from "../../prisma/client.js";
-import { ConflictError, NotFoundError } from "../../shared/http-error.js";
+import { BadRequestError, ConflictError, NotFoundError, } from "../../shared/http-error.js";
 import { toPaginatedResult, } from "../../shared/pagination.js";
+// Transiciones de estado permitidas (sin auto-transicion: el mismo estado es no-op)
+const ALLOWED_TRANSITIONS = {
+    ABIERTO: ["EN PROGRESO", "TERMINADO"],
+    "EN PROGRESO": ["TERMINADO"],
+    TERMINADO: ["REABIERTO"],
+    REABIERTO: ["EN PROGRESO", "TERMINADO"],
+};
 // Estado de la asignación vigente, para no repetir el include en list y detail
 const assignedEmployeeSelect = {
     select: { id: true, fullName: true, isActive: true },
@@ -83,6 +90,8 @@ export const ticketService = {
                         createdAt: true,
                     },
                 },
+                // Evidencia de cierre, para la sección de imágenes del detalle
+                images: { orderBy: { createdAt: "asc" } },
             },
         });
         if (!ticket) {
@@ -110,6 +119,26 @@ export const ticketService = {
     },
     async updateStatus(ticketId, status) {
         await assertTicketExists(ticketId);
+        const current = await prisma.ticket.findUnique({
+            where: { ticketId },
+            select: { status: true },
+        });
+        const from = current?.status;
+        // Reenviar el mismo estado es un no-op (idempotente)
+        if (from === status) {
+            return prisma.ticket.findUniqueOrThrow({ where: { ticketId } });
+        }
+        if (!from || !ALLOWED_TRANSITIONS[from].includes(status)) {
+            throw new BadRequestError(`Transicion de estado invalida: '${from}' -> '${status}'`);
+        }
+        // El cierre exige evidencia: al reabrir no se borran las imagenes,
+        // por lo que re-cerrar cuenta con las que ya tenga el ticket
+        if (status === "TERMINADO") {
+            const imageCount = await prisma.ticketImage.count({ where: { ticketId } });
+            if (imageCount === 0) {
+                throw new BadRequestError("No se puede cerrar un ticket sin imagenes de cierre");
+            }
+        }
         return prisma.ticket.update({ where: { ticketId }, data: { status } });
     },
     /**

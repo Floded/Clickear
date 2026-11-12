@@ -7,8 +7,16 @@ import { establishmentFieldsSchema } from "../establishments/establishment.dto.j
 const ticketEstablishmentSchema = establishmentFieldsSchema
     .omit({ dispatchOrderId: true, isSecondaryBuilding: true })
     .extend({ name: z.string().trim().min(2).max(255).optional() });
-export const TICKET_STATUSES = ["ABIERTO", "EN PROGRESO", "TERMINADO"];
+export const TICKET_STATUSES = [
+    "ABIERTO",
+    "EN PROGRESO",
+    "TERMINADO",
+    "REABIERTO",
+];
 export const ticketStatusSchema = z.enum(TICKET_STATUSES);
+// Un ticket nuevo no puede nacer TERMINADO: el cierre se hace por el flujo
+// de finalización que exige imágenes de evidencia
+export const createTicketStatusSchema = z.enum(["ABIERTO", "EN PROGRESO"]);
 export const createTicketSchema = z.object({
     ticketId: z.coerce.bigint().positive(),
     establishmentCue: z.string().trim().max(20).optional(),
@@ -16,7 +24,7 @@ export const createTicketSchema = z.object({
     title: z.string().trim().min(1),
     glpiClosedTicket: z.string().trim().max(100).optional(),
     openingTimestamp: z.coerce.date().optional(),
-    status: ticketStatusSchema.optional(),
+    status: createTicketStatusSchema.optional(),
 });
 export const listTicketsQuerySchema = paginationQuerySchema.extend({
     status: ticketStatusSchema.optional(),
@@ -37,5 +45,9 @@ export const assignTicketSchema = z.object({
 });
 export const ticketIdParamsSchema = z.object({
     id: z.coerce.bigint(),
+});
+export const ticketImageParamsSchema = z.object({
+    id: z.coerce.bigint(),
+    imageId: z.coerce.number().int().positive(),
 });
 //# sourceMappingURL=ticket.dto.js.map

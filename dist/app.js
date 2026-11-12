@@ -17,12 +17,20 @@ import { authenticate } from "./shared/authenticate.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { budgetRouter } from "./modules/budgets/budget.routes.js";
+import { uploadsStaticDir } from "./modules/tickets/ticket-image.storage.js";
 // Orígenes permitidos para CORS (las cookies requieren un origen explícito)
 const allowedOrigins = (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim());
 export function createApp() {
     const app = express();
+    // Configuración para Render: Render usa un proxy inverso que añade el header X-Forwarded-For
+    // Esto permite que express-rate-limit identifique correctamente las IPs de los clientes
+    app.set("trust proxy", 1);
+    //!Borrar luego
+    console.log("=================================");
+    console.log("TRUST PROXY:", app.get("trust proxy"));
+    console.log("=================================");
     // Request ID for audit trails (SOC 2: unique identification per request)
     app.use(requestIdMiddleware);
     // Security headers (SOC 2 / ISO 27001)
@@ -33,7 +41,7 @@ export function createApp() {
             scriptSrc: ["'self'"],
             imgSrc: ["'self'", "data:"],
             frameSrc: ["'none'"],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://clickear.onrender.com"],
             objectSrc: ["'none'"],
             upgradeInsecureRequests: [],
         },
@@ -51,6 +59,8 @@ export function createApp() {
         standardHeaders: true, // headers RateLimit- remaining/reset
         legacyHeaders: false,
     });
+    //! BORRAR
+    console.log("RATE LIMITER CONFIGURADO");
     app.use("/api/", limiter);
     app.use(cors({ origin: allowedOrigins, credentials: true }));
     app.use(cookieParser());
@@ -58,6 +68,8 @@ export function createApp() {
     app.get("/", (_req, res) => {
         res.json({ name: "clickear-backend", status: "ok" });
     });
+    // Archivos de tickets (imagenes de cierre); publico porque el nombre es aleatorio
+    app.use("/uploads", express.static(uploadsStaticDir, { maxAge: "1d" }));
     app.use("/api", healthRouter);
     app.use("/api/auth", authRouter);
     app.use("/api/establishments", authenticate, establishmentRouter);

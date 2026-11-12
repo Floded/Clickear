@@ -21,8 +21,8 @@ export function toSessionUser(payload) {
 }
 export const sessionCookieOptions = {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: "none",
+    secure: true,
     path: "/",
     maxAge: EXPIRES_IN_SECONDS * 1000,
 };
