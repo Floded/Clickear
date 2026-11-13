@@ -7,24 +7,25 @@ const prisma = new PrismaClient();
 
 // Crea (o actualiza) el usuario administrador inicial a partir del .env
 async function main() {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const username = process.env.ADMIN_USERNAME?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
 
-  if (!email) throw new Error("ADMIN_EMAIL no está definido en .env");
+  if (!username) throw new Error("ADMIN_USERNAME no está definido en .env");
   if (!password) throw new Error("ADMIN_PASSWORD no está definido en .env");
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.upsert({
-    where: { email },
+    where: { username },
     update: { passwordHash, name: process.env.ADMIN_NAME?.trim() || "Administrador" },
     create: {
-      email,
+      username,
       passwordHash,
       name: process.env.ADMIN_NAME?.trim() || "Administrador",
+      role: "ADMIN",
     },
   });
 
-  console.log(`Usuario listo: ${user.email}`);
+  console.log(`Usuario listo: ${user.username} (${user.role})`);
 }
 
 main()

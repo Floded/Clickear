@@ -23,5 +23,6 @@ authRouter.post("/logout", (_req, res) => {
 });
 
 authRouter.get("/me", authenticate, (req, res) => {
+  // req.user ya trae permisos frescos desde la BD
   res.json({ user: toSessionUser(req.user!) });
 });

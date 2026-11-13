@@ -8,6 +8,7 @@ import cors from "cors";
 import express, { type Express } from "express";
 
 import { authRouter } from "./modules/auth/auth.routes.js";
+import { userRouter } from "./modules/users/user.routes.js";
 import { dispatchOrderRouter, technicianRouter } from "./modules/dispatch/dispatch.routes.js";
 import { assignmentRouter } from "./modules/assignments/assignment.routes.js";
 import { employeeRouter } from "./modules/employees/employee.routes.js";
@@ -16,6 +17,8 @@ import { inventoryItemRouter } from "./modules/inventory/inventory-item.routes.j
 import { supplierRouter } from "./modules/suppliers/supplier.routes.js";
 import { ticketRouter } from "./modules/tickets/ticket.routes.js";
 import { authenticate } from "./shared/authenticate.js";
+import { requireFeature } from "./shared/require-feature.js";
+import { requireRole } from "./shared/require-role.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { budgetRouter } from "./modules/budgets/budget.routes.js";
@@ -90,15 +93,16 @@ console.log("RATE LIMITER CONFIGURADO");
   app.use("/api", healthRouter);
   app.use("/api/auth", authRouter);
 
-  app.use("/api/establishments", authenticate, establishmentRouter);
-  app.use("/api/dispatch-orders", authenticate, dispatchOrderRouter);
-  app.use("/api/technicians", authenticate, technicianRouter);
-  app.use("/api/tickets", authenticate, ticketRouter);
-  app.use("/api/suppliers", authenticate, supplierRouter);
-  app.use("/api/employees", authenticate, employeeRouter);
-  app.use("/api/inventory-items", authenticate, inventoryItemRouter);
-  app.use("/api/assignments", authenticate, assignmentRouter);
-  app.use("/api/budgets", authenticate, budgetRouter);
+  app.use("/api/establishments", authenticate, requireFeature("organization"), establishmentRouter);
+  app.use("/api/dispatch-orders", authenticate, requireFeature("organization"), dispatchOrderRouter);
+  app.use("/api/technicians", authenticate, requireFeature("organization"), technicianRouter);
+  app.use("/api/tickets", authenticate, requireFeature("tickets"), ticketRouter);
+  app.use("/api/suppliers", authenticate, requireFeature("inventory"), supplierRouter);
+  app.use("/api/employees", authenticate, requireFeature("organization"), employeeRouter);
+  app.use("/api/inventory-items", authenticate, requireFeature("inventory"), inventoryItemRouter);
+  app.use("/api/assignments", authenticate, requireFeature("inventory"), assignmentRouter);
+  app.use("/api/budgets", authenticate, requireFeature("budgets"), budgetRouter);
+  app.use("/api/users", authenticate, requireRole("ADMIN"), userRouter);
 
   app.use(errorHandler);
 

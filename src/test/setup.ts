@@ -11,8 +11,9 @@ export const prisma = new PrismaClient();
 
 export interface TestUser {
   id: number;
-  email: string;
+  username: string;
   name: string;
+  role: string;
 }
 
 export function createTestApp(): Express {
@@ -22,30 +23,49 @@ export function createTestApp(): Express {
 export function authCookie(user: TestUser): string {
   const payload: SessionPayload = {
     sub: String(user.id),
-    email: user.email,
+    username: user.username,
     name: user.name,
+    role: user.role,
   };
   const token = signSession(payload);
   return `${COOKIE_NAME}=${token}`;
 }
 
+const ALL_FEATURES = ["tickets", "organization", "inventory", "budgets", "invoices"] as const;
+
 export async function createTestUser(overrides?: {
-  email?: string;
+  username?: string;
   password?: string;
   name?: string;
+  role?: string;
+  permissions?: { feature: (typeof ALL_FEATURES)[number]; access: "VIEW" | "EDIT" }[];
 }): Promise<TestUser> {
-  const email = overrides?.email ?? "test@clickear.local";
+  const username = overrides?.username ?? "testuser";
   const password = overrides?.password ?? "TestPass123!";
   const name = overrides?.name ?? "Test User";
+  const role = overrides?.role ?? "GESTOR";
+  // Por defecto, usuarios de prueba no-admin tienen acceso total para no romper tests existentes
+  const permissions =
+    overrides?.permissions ??
+    (role === "ADMIN"
+      ? []
+      : ALL_FEATURES.map((feature) => ({ feature, access: "EDIT" as const })));
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.upsert({
-    where: { email },
-    update: { passwordHash, name },
-    create: { email, passwordHash, name },
+    where: { username },
+    update: { passwordHash, name, role },
+    create: { username, passwordHash, name, role },
   });
 
-  return { id: user.id, email: user.email, name: user.name };
+  await prisma.userPermission.deleteMany({ where: { userId: user.id } });
+  if (permissions.length) {
+    await prisma.userPermission.createMany({
+      data: permissions.map((p) => ({ userId: user.id, feature: p.feature, access: p.access })),
+    });
+  }
+
+  return { id: user.id, username: user.username, name: user.name, role: user.role };
 }
 
 export async function cleanDb(): Promise<void> {
