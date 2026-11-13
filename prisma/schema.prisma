@@ -20,7 +20,35 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp()
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
 
+  permissions UserPermission[]
+
   @@map("users")
+}
+
+// Funcionalidad asignada a un usuario (el ADMIN tiene acceso total implícito)
+enum FeatureKey {
+  tickets
+  organization
+  inventory
+  budgets
+  invoices
+}
+
+// EDIT implica también ver la funcionalidad
+enum AccessMode {
+  VIEW
+  EDIT
+}
+
+model UserPermission {
+  userId Int
+  feature FeatureKey
+  access  AccessMode @default(VIEW)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, feature])
+  @@map("user_permissions")
 }
 
 // ==========================================

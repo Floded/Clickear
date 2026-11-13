@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import jwt from "jsonwebtoken";
+
 import {
   signSession,
   verifySession,
@@ -32,22 +34,30 @@ describe("signSession / verifySession", () => {
   });
 
   it("verifySession con token expirado lanza error", () => {
-    const jwt = require("jsonwebtoken");
-    const expiredToken = jwt.sign(payload, "cualquier-secreto", { expiresIn: -1 });
+    const expiredToken = jwt.sign(payload, process.env.JWT_SECRET ?? "test-secret", {
+      expiresIn: -1,
+    });
     expect(() => verifySession(expiredToken)).toThrow();
   });
 });
 
 describe("toSessionUser", () => {
-  it("extrae id, username, name y role del payload de sesión", () => {
-    const payload = { sub: "10", username: "usuario", name: "Nombre", role: "ADMIN" };
-    const user = toSessionUser(payload);
+  it("extrae id, username, name, role y permisos del usuario autenticado", () => {
+    const authUser = {
+      id: 10,
+      username: "usuario",
+      name: "Nombre",
+      role: "ADMIN",
+      permissions: [{ feature: "tickets" as const, access: "EDIT" as const }],
+    };
+    const user = toSessionUser(authUser);
 
     expect(user).toEqual({
       id: 10,
       username: "usuario",
       name: "Nombre",
       role: "ADMIN",
+      permissions: [{ feature: "tickets", access: "EDIT" }],
     });
   });
 });

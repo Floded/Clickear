@@ -92,11 +92,12 @@ describe("POST /api/auth/logout", () => {
 });
 
 describe("GET /api/auth/me", () => {
-  it("con cookie válida → 200 y usuario con rol", async () => {
+  it("con cookie válida → 200 y usuario con rol y permisos", async () => {
     const user = await createTestUser({
       username: "meuser",
       password: "MePass123!",
       role: "REVISADOR",
+      permissions: [{ feature: "tickets", access: "VIEW" }],
     });
 
     const res = await supertest(app)
@@ -107,6 +108,24 @@ describe("GET /api/auth/me", () => {
     expect(res.body.user.username).toBe(user.username);
     expect(res.body.user.name).toBe(user.name);
     expect(res.body.user.role).toBe("REVISADOR");
+    expect(res.body.user.permissions).toEqual([{ feature: "tickets", access: "VIEW" }]);
+  });
+
+  it("usuario sin funcionalidades asignadas → login rechazado", async () => {
+    await createTestUser({
+      username: "sinpermisos",
+      password: "SinPermisos123!",
+      role: "GESTOR",
+      permissions: [],
+    });
+
+    const res = await supertest(app).post("/api/auth/login").send({
+      username: "sinpermisos",
+      password: "SinPermisos123!",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain("funcionalidades");
   });
 
   it("sin cookie → 401", async () => {

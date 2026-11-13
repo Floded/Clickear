@@ -1,9 +1,9 @@
-import type { SessionPayload } from "./session.js";
+import type { AuthUser } from "./session.js";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: SessionPayload;
+      user?: AuthUser;
     }
   }
 }

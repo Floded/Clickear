@@ -31,16 +31,25 @@ export function authCookie(user: TestUser): string {
   return `${COOKIE_NAME}=${token}`;
 }
 
+const ALL_FEATURES = ["tickets", "organization", "inventory", "budgets", "invoices"] as const;
+
 export async function createTestUser(overrides?: {
   username?: string;
   password?: string;
   name?: string;
   role?: string;
+  permissions?: { feature: (typeof ALL_FEATURES)[number]; access: "VIEW" | "EDIT" }[];
 }): Promise<TestUser> {
   const username = overrides?.username ?? "testuser";
   const password = overrides?.password ?? "TestPass123!";
   const name = overrides?.name ?? "Test User";
   const role = overrides?.role ?? "GESTOR";
+  // Por defecto, usuarios de prueba no-admin tienen acceso total para no romper tests existentes
+  const permissions =
+    overrides?.permissions ??
+    (role === "ADMIN"
+      ? []
+      : ALL_FEATURES.map((feature) => ({ feature, access: "EDIT" as const })));
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.upsert({
@@ -48,6 +57,13 @@ export async function createTestUser(overrides?: {
     update: { passwordHash, name, role },
     create: { username, passwordHash, name, role },
   });
+
+  await prisma.userPermission.deleteMany({ where: { userId: user.id } });
+  if (permissions.length) {
+    await prisma.userPermission.createMany({
+      data: permissions.map((p) => ({ userId: user.id, feature: p.feature, access: p.access })),
+    });
+  }
 
   return { id: user.id, username: user.username, name: user.name, role: user.role };
 }

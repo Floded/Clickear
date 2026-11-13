@@ -54,7 +54,7 @@ describe("GET /api/users", () => {
 });
 
 describe("POST /api/users", () => {
-  it("ADMIN → 201 con usuario creado", async () => {
+  it("ADMIN → 201 con usuario creado y permisos", async () => {
     const res = await supertest(app)
       .post("/api/users")
       .set("Cookie", adminCookie)
@@ -63,12 +63,22 @@ describe("POST /api/users", () => {
         name: "Revisor Uno",
         password: VALID_PASSWORD,
         role: "REVISADOR",
+        permissions: [
+          { feature: "tickets", access: "VIEW" },
+          { feature: "inventory", access: "EDIT" },
+        ],
       });
 
     expect(res.status).toBe(201);
     expect(res.body.username).toBe("revisor01");
     expect(res.body.role).toBe("REVISADOR");
     expect(res.body).not.toHaveProperty("passwordHash");
+    expect(res.body.permissions).toEqual(
+      expect.arrayContaining([
+        { feature: "tickets", access: "VIEW" },
+        { feature: "inventory", access: "EDIT" },
+      ]),
+    );
   });
 
   it("username duplicado → 409", async () => {
@@ -129,17 +139,48 @@ describe("POST /api/users", () => {
 });
 
 describe("PATCH /api/users/:id", () => {
-  it("ADMIN → 200 al cambiar nombre y rol", async () => {
+  it("ADMIN → 200 al cambiar nombre, rol y permisos", async () => {
     const gestor = await prisma.user.findUnique({ where: { username: "gestor" } });
 
     const res = await supertest(app)
       .patch(`/api/users/${gestor!.id}`)
       .set("Cookie", adminCookie)
-      .send({ name: "Gestor Renombrado", role: "REVISADOR" });
+      .send({
+        name: "Gestor Renombrado",
+        role: "REVISADOR",
+        permissions: [{ feature: "tickets", access: "EDIT" }],
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe("Gestor Renombrado");
     expect(res.body.role).toBe("REVISADOR");
+    expect(res.body.permissions).toEqual([{ feature: "tickets", access: "EDIT" }]);
+  });
+
+  it("usuario sin permisos no puede loguear hasta que se le asignen", async () => {
+    const gestor = await prisma.user.findUnique({ where: { username: "gestor" } });
+
+    await supertest(app)
+      .patch(`/api/users/${gestor!.id}`)
+      .set("Cookie", adminCookie)
+      .send({ permissions: [] });
+
+    const denied = await supertest(app).post("/api/auth/login").send({
+      username: "gestor",
+      password: "TestPass123!",
+    });
+    expect(denied.status).toBe(403);
+
+    await supertest(app)
+      .patch(`/api/users/${gestor!.id}`)
+      .set("Cookie", adminCookie)
+      .send({ permissions: [{ feature: "tickets", access: "VIEW" }] });
+
+    const allowed = await supertest(app).post("/api/auth/login").send({
+      username: "gestor",
+      password: "TestPass123!",
+    });
+    expect(allowed.status).toBe(200);
   });
 
   it("cambiar contraseña → login funciona con la nueva", async () => {

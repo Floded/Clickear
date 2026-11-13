@@ -1,8 +1,15 @@
 import { z } from "zod";
 
 export const USER_ROLES = ["GESTOR", "ADMIN", "REVISADOR"] as const;
+export const FEATURES = ["tickets", "organization", "inventory", "budgets", "invoices"] as const;
+export const ACCESS_MODES = ["VIEW", "EDIT"] as const;
 
 export const userRoleSchema = z.enum(USER_ROLES);
+
+export const permissionSchema = z.object({
+  feature: z.enum(FEATURES),
+  access: z.enum(ACCESS_MODES),
+});
 
 // Username técnico: letras, números, punto, guion y guion bajo (se normaliza a minúsculas)
 export const usernameSchema = z
@@ -26,11 +33,19 @@ export const passwordSchema = z
   .regex(/[0-9]/, "Debe contener al menos un número")
   .regex(/[^A-Za-z0-9]/, "Debe contener al menos un carácter especial");
 
+function uniqueFeatures(perms: { feature: string }[]) {
+  return new Set(perms.map((p) => p.feature)).size === perms.length;
+}
+
 export const createUserSchema = z.object({
   username: usernameSchema,
   name: z.string().trim().min(2, "El nombre es obligatorio").max(255),
   password: passwordSchema,
   role: userRoleSchema,
+  permissions: z
+    .array(permissionSchema)
+    .default([])
+    .refine(uniqueFeatures, "Cada funcionalidad solo puede asignarse una vez"),
 });
 
 // La contraseña es opcional al editar: solo se cambia si se envía
@@ -39,6 +54,10 @@ export const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(255).optional(),
   password: passwordSchema.optional(),
   role: userRoleSchema.optional(),
+  permissions: z
+    .array(permissionSchema)
+    .refine(uniqueFeatures, "Cada funcionalidad solo puede asignarse una vez")
+    .optional(),
 });
 
 export const userIdParamsSchema = z.object({
@@ -46,5 +65,6 @@ export const userIdParamsSchema = z.object({
 });
 
 export type UserRole = z.infer<typeof userRoleSchema>;
+export type PermissionInput = z.infer<typeof permissionSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

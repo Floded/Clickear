@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { PrismaClient } from "@prisma/client";
+
+import type { UserPermission } from "./permissions.js";
 
 export const prisma = new PrismaClient();
 
@@ -17,11 +19,21 @@ export interface SessionPayload {
   role: string;
 }
 
+// Usuario autenticado disponible en req.user (permisos resueltos)
+export interface AuthUser {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+  permissions: UserPermission[];
+}
+
 export interface SessionUser {
   id: number;
   username: string;
   name: string;
   role: string;
+  permissions: UserPermission[];
 }
 
 function getSecret(): string {
@@ -38,12 +50,13 @@ export function verifySession(token: string): SessionPayload {
   return jwt.verify(token, getSecret()) as SessionPayload;
 }
 
-export function toSessionUser(payload: SessionPayload): SessionUser {
+export function toSessionUser(user: AuthUser): SessionUser {
   return {
-    id: Number(payload.sub),
-    username: payload.username,
-    name: payload.name,
-    role: payload.role,
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    permissions: user.permissions,
   };
 }
 
@@ -65,7 +78,7 @@ export async function logAuthAttempt(
   try {
     await prisma.auditLog.create({
       data: {
-        userId: req.user?.sub ? Number(req.user.sub) : null,
+        userId: req.user?.id ?? null,
         action: success ? "login_success" : "login_failure",
         resource: "auth",
         details: {
