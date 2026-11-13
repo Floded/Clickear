@@ -61,7 +61,7 @@
 - [x] Rango de fechas (`from` / `to`) en ambas exportaciones: tickets por `openingTimestamp`, asignaciones por `deliveryDate`. El cliente envía ISO de inicio/fin de día locales para que el rango sea inclusivo.
 
 ### Login por usuario y roles
-- [ ] Migración: `User` con `username` (unique) y `role` (GESTOR/ADMIN/REVISADOR); eliminar `email`. Backfill: admin existente → `gabriel.lillo_clic`, role `ADMIN`.
-- [ ] Login por username + contraseña (JWT/sesión con `username` y `role`).
-- [ ] Módulo `users/` CRUD (solo ADMIN): listar, crear, editar y eliminar; proteger el último ADMIN.
-- [ ] `seed.ts` con `ADMIN_USERNAME` y rol `ADMIN`.
+- [x] Migración: `User` con `username` (unique) y `role` (GESTOR/ADMIN/REVISADOR); eliminar `email`. Backfill: admin existente → `gabriel.lillo_clic`, role `ADMIN`.
+- [x] Login por username + contraseña (JWT/sesión con `username` y `role`).
+- [x] Módulo `users/` CRUD (solo ADMIN): listar, crear, editar y eliminar; proteger el último ADMIN.
+- [x] `seed.ts` con `ADMIN_USERNAME` y rol `ADMIN`. → Rama `future-login-usuario-roles`; suite 215/215 en verde.
