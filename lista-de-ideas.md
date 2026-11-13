@@ -57,5 +57,5 @@
 ## 5. Extras fuera del roadmap original
 
 ### Exportaciones a Excel
-- [x] Exportación de tickets (`GET /api/tickets/export`) y asignaciones de inventario (`GET /api/assignments/export`). → `shared/excel.ts` con exceljs; protegidos por auth, sin paginación, con los filtros del listado. Mergeada a `dev`.
-- [ ] Rango de fechas (`from` / `to`) en ambas exportaciones: tickets por `openingTimestamp`, asignaciones por `deliveryDate`. Inclusive hasta fin del día.
+- [x] Exportación de tickets (`GET /api/tickets/export`) y asignaciones de inventario (`GET /api/assignments/export`). → `shared/excel.ts` con exceljs; protegidos por auth, sin paginación, con los filtros del listado.
+- [x] Rango de fechas (`from` / `to`) en ambas exportaciones: tickets por `openingTimestamp`, asignaciones por `deliveryDate`. El cliente envía ISO de inicio/fin de día locales para que el rango sea inclusivo.
