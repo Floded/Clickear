@@ -76,7 +76,7 @@ La sesión se maneja con un **JWT en cookie `httpOnly`** (7 días, `SameSite=Lax
 # Login (ok -> {"user":{...}} + Set-Cookie: auth_token=...; HttpOnly; SameSite=Lax)
 curl -i -c cookies.txt -X POST http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@clickear.local","password":"..."}'
+  -d '{"username":"admin","password":"..."}'
 
 # Sesión actual (401 si no hay cookie válida)
 curl -b cookies.txt http://localhost:3000/api/auth/me
@@ -85,9 +85,15 @@ curl -b cookies.txt http://localhost:3000/api/auth/me
 curl -b cookies.txt -c cookies.txt -X POST http://localhost:3000/api/auth/logout
 ```
 
-Errores: `400` si el body no valida, `401` con mensaje genérico `"Credenciales incorrectas"` si el email o la contraseña no coinciden (no se distingue cuál falló).
+Errores: `400` si el body no valida, `401` con mensaje genérico `"Credenciales incorrectas"` si el usuario o la contraseña no coinciden (no se distingue cuál falló).
 
-El usuario inicial se crea con `npm run db:seed` usando `ADMIN_EMAIL` / `ADMIN_PASSWORD` del `.env`.
+El usuario inicial se crea con `npm run db:seed` (ver variables `ADMIN_*` en `.env`).
+
+### Permisos y acceso
+
+- `ADMIN`: acceso total implícito a todas las funcionalidades.
+- Usuarios no admin: permisos por funcionalidad (`tickets`, `organization`, `inventory`, `budgets`, `invoices`) con acceso `VIEW` o `EDIT` (`EDIT` implica ver).
+- Las rutas protegidas exigen sesión y el permiso requerido por funcionalidad (lectura o edición). Si el usuario no tiene permisos asignados, el login es rechazado.
 
 ---
 
@@ -285,6 +291,26 @@ curl -X PATCH http://localhost:3000/api/tickets/125691/status \
 | `GET` | Listado paginado, filtros `status` (`ACTIVE`/`RETURNED`), `employeeId`, `inventoryItemId` | — |
 | `POST` | Asignación transaccional (`409` si no hay stock suficiente) | `{"inventoryItemId": 1, "employeeId": 2, "quantityAssigned": 2, "deliveryDate": "2026-11-01", "notes": "…"}` → `201` |
 | `PUT /:id/return` | Devolución total o parcial con re-stock atómico | `{"quantity": 1, "returnDate": "2026-11-05", "notes": "…"}` |
+
+---
+
+## Usuarios (`/api/users`) — solo ADMIN
+
+Gestión de usuarios del sistema y sus permisos por funcionalidad.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/users` | Listado de usuarios (ordenado por username) |
+| `POST` | `/api/users` | Alta de usuario → `201` |
+| `PATCH` | `/api/users/:id` | Modificación parcial (username, nombre, rol, contraseña, permisos) |
+| `DELETE` | `/api/users/:id` | Baja → `204` |
+
+Notas:
+- Campos principales: `username`, `name`, `role` (`ADMIN` \| `GESTOR` \| `REVISADOR`), `password` (obligatoria en alta, opcional en edición), `permissions[]`.
+- `permissions[]`: `{ "feature": "tickets"|"organization"|"inventory"|"budgets"|"invoices", "access": "VIEW"|"EDIT" }` (sin duplicados por feature).
+- `ADMIN` tiene acceso total implícito (no requiere/periste permisos redundantes).
+- Usuarios no admin deben tener al menos una funcionalidad asignada según reglas de negocio/UI.
+- Reglas: username único (`409` si duplicado), no se puede quitar ni eliminar el último administrador (`409`).
 
 ---
 
