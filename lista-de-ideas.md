@@ -59,3 +59,9 @@
 ### Exportaciones a Excel
 - [x] Exportación de tickets (`GET /api/tickets/export`) y asignaciones de inventario (`GET /api/assignments/export`). → `shared/excel.ts` con exceljs; protegidos por auth, sin paginación, con los filtros del listado.
 - [x] Rango de fechas (`from` / `to`) en ambas exportaciones: tickets por `openingTimestamp`, asignaciones por `deliveryDate`. El cliente envía ISO de inicio/fin de día locales para que el rango sea inclusivo.
+
+### Login por usuario y roles
+- [ ] Migración: `User` con `username` (unique) y `role` (GESTOR/ADMIN/REVISADOR); eliminar `email`. Backfill: admin existente → `gabriel.lillo_clic`, role `ADMIN`.
+- [ ] Login por username + contraseña (JWT/sesión con `username` y `role`).
+- [ ] Módulo `users/` CRUD (solo ADMIN): listar, crear, editar y eliminar; proteger el último ADMIN.
+- [ ] `seed.ts` con `ADMIN_USERNAME` y rol `ADMIN`.

@@ -9,7 +9,7 @@ beforeEach(async () => {
   app = createTestApp();
   await cleanTables([]);
   const user = await createTestUser({
-    email: "authmiddleware@clickear.local",
+    username: "authmiddleware",
     password: "AuthMiddlewarePass123!",
   });
   authHeader = authCookie(user);
@@ -31,7 +31,7 @@ describe("authenticate middleware", () => {
       .set("Cookie", authHeader);
 
     expect(res.status).toBe(200);
-    expect(res.body.user.email).toBe("authmiddleware@clickear.local");
+    expect(res.body.user.username).toBe("authmiddleware");
   });
 
   it("sin cookie → 401 Sesión no encontrada", async () => {
@@ -53,7 +53,7 @@ describe("authenticate middleware", () => {
   it("con token expirado → 401", async () => {
     const jwt = require("jsonwebtoken");
     const expiredToken = jwt.sign(
-      { sub: "1", email: "exp@clickear.local", name: "Expirado" },
+      { sub: "1", username: "exp", name: "Expirado" },
       process.env.JWT_SECRET ?? "secret",
       { expiresIn: -1 },
     );

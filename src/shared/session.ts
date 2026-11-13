@@ -12,14 +12,16 @@ const EXPIRES_IN_SECONDS = Number(process.env.JWT_EXPIRES_IN) || 7 * 24 * 60 * 6
 
 export interface SessionPayload {
   sub: string;
-  email: string;
+  username: string;
   name: string;
+  role: string;
 }
 
 export interface SessionUser {
   id: number;
-  email: string;
+  username: string;
   name: string;
+  role: string;
 }
 
 function getSecret(): string {
@@ -37,7 +39,12 @@ export function verifySession(token: string): SessionPayload {
 }
 
 export function toSessionUser(payload: SessionPayload): SessionUser {
-  return { id: Number(payload.sub), email: payload.email, name: payload.name };
+  return {
+    id: Number(payload.sub),
+    username: payload.username,
+    name: payload.name,
+    role: payload.role,
+  };
 }
 
 export const sessionCookieOptions = {

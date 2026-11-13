@@ -10,8 +10,9 @@ import {
 describe("signSession / verifySession", () => {
   const payload = {
     sub: "42",
-    email: "usuario@clickear.local",
+    username: "usuario",
     name: "Usuario Test",
+    role: "GESTOR",
   };
 
   it("signSession produce un JWT verificable", () => {
@@ -21,8 +22,9 @@ describe("signSession / verifySession", () => {
 
     const decoded = verifySession(token);
     expect(decoded.sub).toBe(payload.sub);
-    expect(decoded.email).toBe(payload.email);
+    expect(decoded.username).toBe(payload.username);
     expect(decoded.name).toBe(payload.name);
+    expect(decoded.role).toBe(payload.role);
   });
 
   it("verifySession con token inválido lanza error", () => {
@@ -37,11 +39,16 @@ describe("signSession / verifySession", () => {
 });
 
 describe("toSessionUser", () => {
-  it("extrae id, email y name del payload de sesión", () => {
-    const payload = { sub: "10", email: "a@b.com", name: "Nombre" };
+  it("extrae id, username, name y role del payload de sesión", () => {
+    const payload = { sub: "10", username: "usuario", name: "Nombre", role: "ADMIN" };
     const user = toSessionUser(payload);
 
-    expect(user).toEqual({ id: 10, email: "a@b.com", name: "Nombre" });
+    expect(user).toEqual({
+      id: 10,
+      username: "usuario",
+      name: "Nombre",
+      role: "ADMIN",
+    });
   });
 });
 

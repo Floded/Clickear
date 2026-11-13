@@ -5,7 +5,7 @@ import { HttpError } from "../../shared/http-error.js";
 import { signSession, type SessionUser } from "../../shared/session.js";
 import type { LoginInput } from "./auth.dto.js";
 
-// Hash de relleno para que un email inexistente tarde lo mismo que uno válido
+// Hash de relleno para que un username inexistente tarde lo mismo que uno válido
 let dummyHash: string | null = null;
 async function getDummyHash(): Promise<string> {
   dummyHash ??= await bcrypt.hash("timing-equalizer", 10);
@@ -19,7 +19,7 @@ export interface LoginResult {
 
 async function login(input: LoginInput): Promise<LoginResult> {
   const user = await prisma.user.findUnique({
-    where: { email: input.email.toLowerCase() },
+    where: { username: input.username.toLowerCase() },
   });
 
   const isValid = await bcrypt.compare(
@@ -31,8 +31,18 @@ async function login(input: LoginInput): Promise<LoginResult> {
   }
 
   return {
-    token: signSession({ sub: String(user.id), email: user.email, name: user.name }),
-    user: { id: user.id, email: user.email, name: user.name },
+    token: signSession({
+      sub: String(user.id),
+      username: user.username,
+      name: user.name,
+      role: user.role,
+    }),
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+    },
   };
 }
 

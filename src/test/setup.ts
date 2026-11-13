@@ -11,8 +11,9 @@ export const prisma = new PrismaClient();
 
 export interface TestUser {
   id: number;
-  email: string;
+  username: string;
   name: string;
+  role: string;
 }
 
 export function createTestApp(): Express {
@@ -22,30 +23,33 @@ export function createTestApp(): Express {
 export function authCookie(user: TestUser): string {
   const payload: SessionPayload = {
     sub: String(user.id),
-    email: user.email,
+    username: user.username,
     name: user.name,
+    role: user.role,
   };
   const token = signSession(payload);
   return `${COOKIE_NAME}=${token}`;
 }
 
 export async function createTestUser(overrides?: {
-  email?: string;
+  username?: string;
   password?: string;
   name?: string;
+  role?: string;
 }): Promise<TestUser> {
-  const email = overrides?.email ?? "test@clickear.local";
+  const username = overrides?.username ?? "testuser";
   const password = overrides?.password ?? "TestPass123!";
   const name = overrides?.name ?? "Test User";
+  const role = overrides?.role ?? "GESTOR";
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.upsert({
-    where: { email },
-    update: { passwordHash, name },
-    create: { email, passwordHash, name },
+    where: { username },
+    update: { passwordHash, name, role },
+    create: { username, passwordHash, name, role },
   });
 
-  return { id: user.id, email: user.email, name: user.name };
+  return { id: user.id, username: user.username, name: user.name, role: user.role };
 }
 
 export async function cleanDb(): Promise<void> {
