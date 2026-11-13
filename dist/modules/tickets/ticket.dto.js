@@ -35,6 +35,9 @@ export const listTicketsQuerySchema = paginationQuerySchema.extend({
         .union([z.coerce.number().int().positive(), z.literal("none")])
         .optional(),
     search: z.string().trim().optional(),
+    // Rango por apertura; el cliente envía ISO con inicio/fin de día locales
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
 });
 export const updateTicketStatusSchema = z.object({
     status: ticketStatusSchema,

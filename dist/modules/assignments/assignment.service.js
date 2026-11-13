@@ -1,4 +1,5 @@
 import { prisma } from "../../prisma/client.js";
+import { formatDate } from "../../shared/excel.js";
 import { ConflictError, NotFoundError, } from "../../shared/http-error.js";
 import { toPaginatedResult, } from "../../shared/pagination.js";
 const assignmentInclude = {
@@ -32,15 +33,7 @@ export const assignmentService = {
         };
     },
     async list(query) {
-        const where = {
-            employeeId: query.employeeId,
-            inventoryItemId: query.inventoryItemId,
-            returnDate: query.status === "ACTIVE"
-                ? null
-                : query.status === "RETURNED"
-                    ? { not: null }
-                    : undefined,
-        };
+        const where = buildAssignmentWhere(query);
         const [items, total] = await prisma.$transaction([
             prisma.itemAssignment.findMany({
                 where,
@@ -52,6 +45,35 @@ export const assignmentService = {
             prisma.itemAssignment.count({ where }),
         ]);
         return toPaginatedResult(items, total, query);
+    },
+    /**
+     * Asignaciones para exportación: mismas condiciones de filtro que list()
+     * pero sin paginación. Devuelve filas ya formateadas para el Excel.
+     */
+    async exportRows(query) {
+        const assignments = await prisma.itemAssignment.findMany({
+            where: buildAssignmentWhere(query),
+            orderBy: { deliveryDate: "desc" },
+            include: {
+                inventoryItem: {
+                    select: {
+                        name: true,
+                        supplier: { select: { name: true } },
+                    },
+                },
+                employee: { select: { fullName: true } },
+            },
+        });
+        return assignments.map((assignment) => [
+            assignment.inventoryItem.name,
+            assignment.inventoryItem.supplier?.name ?? null,
+            assignment.employee.fullName,
+            assignment.quantityAssigned,
+            formatDate(assignment.deliveryDate),
+            formatDate(assignment.returnDate),
+            assignment.returnDate === null ? "ACTIVE" : "RETURNED",
+            assignment.notes ?? null,
+        ]);
     },
     /**
      * Entrega de stock al empleado (transacción atómica):
@@ -163,6 +185,21 @@ export const assignmentService = {
         });
     },
 };
+function buildAssignmentWhere(query) {
+    return {
+        employeeId: query.employeeId,
+        inventoryItemId: query.inventoryItemId,
+        returnDate: query.status === "ACTIVE"
+            ? null
+            : query.status === "RETURNED"
+                ? { not: null }
+                : undefined,
+        deliveryDate: {
+            gte: query.from,
+            lte: query.to,
+        },
+    };
+}
 async function assertEmployeeExists(employeeId) {
     const found = await prisma.employee.count({ where: { id: employeeId } });
     if (found === 0) {
