@@ -12,7 +12,7 @@ beforeEach(async () => {
         "establishments", "employees",
     ]);
     const user = await createTestUser({
-        email: "integration@clickear.local",
+        username: "integration",
         password: "IntegrationPass123!",
     });
     authHeader = authCookie(user);

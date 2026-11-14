@@ -22,6 +22,7 @@ import { requireRole } from "./shared/require-role.js";
 import { errorHandler } from "./shared/error-handler.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { budgetRouter } from "./modules/budgets/budget.routes.js";
+import { companySettingsRouter } from "./modules/company-settings/company-settings.routes.js";
 import { uploadsStaticDir } from "./modules/tickets/ticket-image.storage.js";
 
 // Orígenes permitidos para CORS (las cookies requieren un origen explícito)
@@ -102,6 +103,7 @@ console.log("RATE LIMITER CONFIGURADO");
   app.use("/api/inventory-items", authenticate, requireFeature("inventory"), inventoryItemRouter);
   app.use("/api/assignments", authenticate, requireFeature("inventory"), assignmentRouter);
   app.use("/api/budgets", authenticate, requireFeature("budgets"), budgetRouter);
+  app.use("/api/company-settings", authenticate, requireRole("ADMIN"), companySettingsRouter);
   app.use("/api/users", authenticate, requireRole("ADMIN"), userRouter);
 
   app.use(errorHandler);

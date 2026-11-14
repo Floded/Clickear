@@ -17,5 +17,8 @@ export const listAssignmentsQuerySchema = paginationQuerySchema.extend({
     inventoryItemId: z.coerce.number().int().positive().optional(),
     // ACTIVE = en custodia (sin devolver), RETURNED = devuelto al depot
     status: z.enum(["ACTIVE", "RETURNED"]).optional(),
+    // Rango por fecha de entrega; el cliente envía ISO con inicio/fin de día locales
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
 });
 //# sourceMappingURL=assignment.dto.js.map

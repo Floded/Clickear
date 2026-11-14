@@ -7,7 +7,7 @@ beforeEach(async () => {
     app = createTestApp();
     await cleanTables(["establishments"]);
     const user = await createTestUser({
-        email: "estab@clickear.local",
+        username: "estab",
         password: "EstabPass123!",
     });
     authHeader = authCookie(user);

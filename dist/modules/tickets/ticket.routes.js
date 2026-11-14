@@ -3,11 +3,35 @@ import { assignTicketSchema, createTicketSchema, listTicketsQuerySchema, ticketI
 import { ticketImageService } from "./ticket-image.service.js";
 import { handleUploadError, MAX_IMAGES_PER_TICKET, ticketImageUpload, } from "./ticket-image.storage.js";
 import { BadRequestError } from "../../shared/http-error.js";
+import { fileDateSuffix, sendExcel, } from "../../shared/excel.js";
 import { ticketService } from "./ticket.service.js";
 export const ticketRouter = Router();
 ticketRouter.get("/", async (req, res) => {
     const query = listTicketsQuerySchema.parse(req.query);
     res.json(await ticketService.list(query));
+});
+// Exportación a Excel de todos los tickets que cumplan los filtros (sin paginar)
+ticketRouter.get("/export", async (req, res) => {
+    const query = listTicketsQuerySchema.parse(req.query);
+    const rows = await ticketService.exportRows(query);
+    const sheet = {
+        name: "Tickets",
+        columns: [
+            { header: "# Ticket", width: 14 },
+            { header: "Título", width: 40 },
+            { header: "Estado", width: 14 },
+            { header: "GLPI (cerrado)", width: 16 },
+            { header: "CUE", width: 14 },
+            { header: "Establecimiento", width: 30 },
+            { header: "Departamento", width: 18 },
+            { header: "Localidad", width: 18 },
+            { header: "Asignado a", width: 28 },
+            { header: "Empleado activo", width: 14 },
+            { header: "Apertura", width: 18 },
+        ],
+        rows,
+    };
+    await sendExcel(res, `tickets-${fileDateSuffix()}.xlsx`, [sheet]);
 });
 ticketRouter.get("/:id", async (req, res) => {
     const { id } = ticketIdParamsSchema.parse(req.params);
