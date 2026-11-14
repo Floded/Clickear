@@ -307,6 +307,8 @@ model CompanySettings {
   legalName           String?  @map("legal_name") @db.VarChar(255)
   logoUrl             String?  @map("logo_url") @db.Text
   logoPath            String?  @map("logo_path") @db.Text
+  signatureUrl        String?  @map("signature_url") @db.Text
+  signaturePath       String?  @map("signature_path") @db.Text
 
   responsibleName     String?  @map("responsible_name") @db.VarChar(255)
   responsiblePosition String?  @map("responsible_position") @db.VarChar(255)

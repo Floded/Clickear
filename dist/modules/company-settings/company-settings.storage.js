@@ -4,12 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { BadRequestError } from "../../shared/http-error.js";
 export const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+export const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 export const ALLOWED_LOGO_MIME_TYPES = [
     "image/png",
     "image/jpeg",
     "image/jpg",
     "image/svg+xml",
 ];
+export const ALLOWED_SIGNATURE_MIME_TYPES = ALLOWED_LOGO_MIME_TYPES;
 const EXTENSION_BY_MIME = {
     "image/png": "png",
     "image/jpeg": "jpg",
@@ -18,17 +20,19 @@ const EXTENSION_BY_MIME = {
 };
 function getStorageConfig() {
     const url = process.env.SUPABASE_URL?.trim();
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    // Acepta la nueva clave secreta (sb_secret_...) y mantiene compatibilidad con service_role legacy
+    const secretKey = process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
     const bucket = process.env.SUPABASE_STORAGE_BUCKET?.trim();
-    const prefix = (process.env.SUPABASE_STORAGE_COMPANY_LOGO_PREFIX?.trim() || "company").replace(/^\/+|\/+$/g, "");
-    if (!url || !serviceRoleKey || !bucket) {
-        throw new BadRequestError("Configuración de Supabase Storage incompleta (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET)");
+    const logoPrefix = (process.env.SUPABASE_STORAGE_COMPANY_LOGO_PREFIX?.trim() || "company").replace(/^\/+|\/+$/g, "");
+    const signaturePrefix = (process.env.SUPABASE_STORAGE_COMPANY_SIGNATURE_PREFIX?.trim() || `${logoPrefix}/signatures`).replace(/^\/+|\/+$/g, "");
+    if (!url || !secretKey || !bucket) {
+        throw new BadRequestError("Configuración de Supabase Storage incompleta (SUPABASE_URL, SUPABASE_SECRET_KEY o SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET)");
     }
-    return { url, serviceRoleKey, bucket, prefix };
+    return { url, secretKey, bucket, logoPrefix, signaturePrefix };
 }
 function getSupabaseClient() {
-    const { url, serviceRoleKey } = getStorageConfig();
-    return createClient(url, serviceRoleKey, {
+    const { url, secretKey } = getStorageConfig();
+    return createClient(url, secretKey, {
         auth: { persistSession: false, autoRefreshToken: false },
     });
 }
@@ -44,60 +48,91 @@ function isSafeSvg(buffer) {
         return false;
     return true;
 }
-export const companyLogoUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: MAX_LOGO_SIZE_BYTES, files: 1 },
-    fileFilter: (_req, file, cb) => {
-        if (ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
-            cb(null, true);
-            return;
-        }
-        cb(new BadRequestError(`Tipo de archivo no permitido '${file.mimetype}'. Solo PNG, JPG, JPEG o SVG`));
-    },
-});
-export function handleLogoUploadError(err, _req, _res, next) {
-    if (err instanceof multer.MulterError) {
-        next(new BadRequestError(`Error al subir logotipo: ${err.message}`));
-        return;
-    }
-    next(err);
+function getAssetLabels(kind) {
+    return kind === "logo"
+        ? { item: "logotipo", previous: "logotipo anterior" }
+        : { item: "firma", previous: "firma anterior" };
 }
-function buildLogoPath(file) {
-    const { prefix } = getStorageConfig();
+function buildAssetPath(kind, file) {
+    const config = getStorageConfig();
+    const prefix = kind === "logo" ? config.logoPrefix : config.signaturePrefix;
     const ext = EXTENSION_BY_MIME[file.mimetype] ??
         (path.extname(file.originalname).replace(/^\./, "") || "bin");
-    const filename = `logo-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
+    const filename = `${kind}-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
     return `${prefix}/${filename}`;
 }
-export async function uploadCompanyLogoToStorage(file) {
+async function uploadAssetToStorage(kind, file) {
+    const labels = getAssetLabels(kind);
     if (file.mimetype === "image/svg+xml" && !isSafeSvg(file.buffer)) {
         throw new BadRequestError("El archivo SVG contiene contenido no permitido");
     }
     const supabase = getSupabaseClient();
     const { bucket } = getStorageConfig();
-    const logoPath = buildLogoPath(file);
-    const { error } = await supabase.storage.from(bucket).upload(logoPath, file.buffer, {
+    const assetPath = buildAssetPath(kind, file);
+    const { error } = await supabase.storage.from(bucket).upload(assetPath, file.buffer, {
         contentType: file.mimetype,
         upsert: false,
         cacheControl: "3600",
     });
     if (error) {
-        throw new BadRequestError(`No se pudo subir el logotipo: ${error.message}`);
+        throw new BadRequestError(`No se pudo subir ${labels.item === "firma" ? "la firma" : "el logotipo"}: ${error.message}`);
     }
-    const { data } = supabase.storage.from(bucket).getPublicUrl(logoPath);
+    const { data } = supabase.storage.from(bucket).getPublicUrl(assetPath);
     if (!data?.publicUrl) {
-        throw new BadRequestError("No se pudo obtener la URL pública del logotipo");
+        throw new BadRequestError(`No se pudo obtener la URL pública ${labels.item === "firma" ? "de la firma" : "del logotipo"}`);
     }
-    return { logoUrl: data.publicUrl, logoPath };
+    return { url: data.publicUrl, path: assetPath };
 }
-export async function removeCompanyLogoFromStorage(logoPath) {
-    if (!logoPath)
+async function removeAssetFromStorage(kind, assetPath) {
+    if (!assetPath)
         return;
+    const labels = getAssetLabels(kind);
     const supabase = getSupabaseClient();
     const { bucket } = getStorageConfig();
-    const { error } = await supabase.storage.from(bucket).remove([logoPath]);
+    const { error } = await supabase.storage.from(bucket).remove([assetPath]);
     if (error) {
-        throw new BadRequestError(`No se pudo eliminar el logotipo anterior: ${error.message}`);
+        throw new BadRequestError(`No se pudo eliminar ${labels.previous}: ${error.message}`);
     }
+}
+function createUploadErrorHandler(kind) {
+    return (err, _req, _res, next) => {
+        if (err instanceof multer.MulterError) {
+            const label = kind === "logo" ? "logotipo" : "firma";
+            next(new BadRequestError(`Error al subir ${label}: ${err.message}`));
+            return;
+        }
+        next(err);
+    };
+}
+function createUploadMiddleware(maxSize, allowedMimeTypes, itemLabel) {
+    return multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: maxSize, files: 1 },
+        fileFilter: (_req, file, cb) => {
+            if (allowedMimeTypes.includes(file.mimetype)) {
+                cb(null, true);
+                return;
+            }
+            cb(new BadRequestError(`Tipo de archivo no permitido '${file.mimetype}'. Solo PNG, JPG, JPEG o SVG`));
+        },
+    });
+}
+export const companyLogoUpload = createUploadMiddleware(MAX_LOGO_SIZE_BYTES, ALLOWED_LOGO_MIME_TYPES, "logotipo");
+export const companySignatureUpload = createUploadMiddleware(MAX_SIGNATURE_SIZE_BYTES, ALLOWED_SIGNATURE_MIME_TYPES, "firma");
+export const handleLogoUploadError = createUploadErrorHandler("logo");
+export const handleSignatureUploadError = createUploadErrorHandler("signature");
+export async function uploadCompanyLogoToStorage(file) {
+    const result = await uploadAssetToStorage("logo", file);
+    return { logoUrl: result.url, logoPath: result.path };
+}
+export async function removeCompanyLogoFromStorage(logoPath) {
+    await removeAssetFromStorage("logo", logoPath);
+}
+export async function uploadCompanySignatureToStorage(file) {
+    const result = await uploadAssetToStorage("signature", file);
+    return { signatureUrl: result.url, signaturePath: result.path };
+}
+export async function removeCompanySignatureFromStorage(signaturePath) {
+    await removeAssetFromStorage("signature", signaturePath);
 }
 //# sourceMappingURL=company-settings.storage.js.map

@@ -8,6 +8,7 @@ import type { NextFunction, Request, Response } from "express";
 import { BadRequestError } from "../../shared/http-error.js";
 
 export const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+export const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export const ALLOWED_LOGO_MIME_TYPES = [
   "image/png",
@@ -16,6 +17,8 @@ export const ALLOWED_LOGO_MIME_TYPES = [
   "image/svg+xml",
 ] as const;
 
+export const ALLOWED_SIGNATURE_MIME_TYPES = ALLOWED_LOGO_MIME_TYPES;
+
 const EXTENSION_BY_MIME: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -23,16 +26,34 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   "image/svg+xml": "svg",
 };
 
-function getStorageConfig() {
+type AssetKind = "logo" | "signature";
+
+type StorageConfig = {
+  url: string;
+  secretKey: string;
+  bucket: string;
+  logoPrefix: string;
+  signaturePrefix: string;
+};
+
+type UploadAssetResult = {
+  url: string;
+  path: string;
+};
+
+function getStorageConfig(): StorageConfig {
   const url = process.env.SUPABASE_URL?.trim();
   // Acepta la nueva clave secreta (sb_secret_...) y mantiene compatibilidad con service_role legacy
   const secretKey =
     process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const bucket = process.env.SUPABASE_STORAGE_BUCKET?.trim();
-  const prefix = (process.env.SUPABASE_STORAGE_COMPANY_LOGO_PREFIX?.trim() || "company").replace(
+  const logoPrefix = (process.env.SUPABASE_STORAGE_COMPANY_LOGO_PREFIX?.trim() || "company").replace(
     /^\/+|\/+$/g,
     "",
   );
+  const signaturePrefix = (
+    process.env.SUPABASE_STORAGE_COMPANY_SIGNATURE_PREFIX?.trim() || `${logoPrefix}/signatures`
+  ).replace(/^\/+|\/+$/g, "");
 
   if (!url || !secretKey || !bucket) {
     throw new BadRequestError(
@@ -40,7 +61,7 @@ function getStorageConfig() {
     );
   }
 
-  return { url, secretKey, bucket, prefix };
+  return { url, secretKey, bucket, logoPrefix, signaturePrefix };
 }
 
 function getSupabaseClient() {
@@ -59,80 +80,125 @@ function isSafeSvg(buffer: Buffer): boolean {
   return true;
 }
 
-export const companyLogoUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_LOGO_SIZE_BYTES, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    if ((ALLOWED_LOGO_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
-      cb(null, true);
-      return;
-    }
-    cb(
-      new BadRequestError(
-        `Tipo de archivo no permitido '${file.mimetype}'. Solo PNG, JPG, JPEG o SVG`,
-      ),
-    );
-  },
-});
-
-export function handleLogoUploadError(
-  err: unknown,
-  _req: Request,
-  _res: Response,
-  next: NextFunction,
-): void {
-  if (err instanceof multer.MulterError) {
-    next(new BadRequestError(`Error al subir logotipo: ${err.message}`));
-    return;
-  }
-  next(err);
+function getAssetLabels(kind: AssetKind) {
+  return kind === "logo"
+    ? { item: "logotipo", previous: "logotipo anterior" }
+    : { item: "firma", previous: "firma anterior" };
 }
 
-function buildLogoPath(file: Express.Multer.File): string {
-  const { prefix } = getStorageConfig();
+function buildAssetPath(kind: AssetKind, file: Express.Multer.File): string {
+  const config = getStorageConfig();
+  const prefix = kind === "logo" ? config.logoPrefix : config.signaturePrefix;
   const ext =
     EXTENSION_BY_MIME[file.mimetype] ??
     (path.extname(file.originalname).replace(/^\./, "") || "bin");
-  const filename = `logo-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
+  const filename = `${kind}-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
   return `${prefix}/${filename}`;
 }
 
-export async function uploadCompanyLogoToStorage(file: Express.Multer.File): Promise<{
-  logoUrl: string;
-  logoPath: string;
-}> {
+async function uploadAssetToStorage(
+  kind: AssetKind,
+  file: Express.Multer.File,
+): Promise<UploadAssetResult> {
+  const labels = getAssetLabels(kind);
   if (file.mimetype === "image/svg+xml" && !isSafeSvg(file.buffer)) {
     throw new BadRequestError("El archivo SVG contiene contenido no permitido");
   }
 
   const supabase = getSupabaseClient();
   const { bucket } = getStorageConfig();
-  const logoPath = buildLogoPath(file);
+  const assetPath = buildAssetPath(kind, file);
 
-  const { error } = await supabase.storage.from(bucket).upload(logoPath, file.buffer, {
+  const { error } = await supabase.storage.from(bucket).upload(assetPath, file.buffer, {
     contentType: file.mimetype,
     upsert: false,
     cacheControl: "3600",
   });
 
   if (error) {
-    throw new BadRequestError(`No se pudo subir el logotipo: ${error.message}`);
+    throw new BadRequestError(`No se pudo subir ${labels.item === "firma" ? "la firma" : "el logotipo"}: ${error.message}`);
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(logoPath);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(assetPath);
   if (!data?.publicUrl) {
-    throw new BadRequestError("No se pudo obtener la URL pública del logotipo");
+    throw new BadRequestError(
+      `No se pudo obtener la URL pública ${labels.item === "firma" ? "de la firma" : "del logotipo"}`,
+    );
   }
 
-  return { logoUrl: data.publicUrl, logoPath };
+  return { url: data.publicUrl, path: assetPath };
+}
+
+async function removeAssetFromStorage(kind: AssetKind, assetPath: string | null | undefined): Promise<void> {
+  if (!assetPath) return;
+  const labels = getAssetLabels(kind);
+  const supabase = getSupabaseClient();
+  const { bucket } = getStorageConfig();
+  const { error } = await supabase.storage.from(bucket).remove([assetPath]);
+  if (error) {
+    throw new BadRequestError(`No se pudo eliminar ${labels.previous}: ${error.message}`);
+  }
+}
+
+function createUploadErrorHandler(kind: AssetKind) {
+  return (err: unknown, _req: Request, _res: Response, next: NextFunction): void => {
+    if (err instanceof multer.MulterError) {
+      const label = kind === "logo" ? "logotipo" : "firma";
+      next(new BadRequestError(`Error al subir ${label}: ${err.message}`));
+      return;
+    }
+    next(err);
+  };
+}
+
+function createUploadMiddleware(maxSize: number, allowedMimeTypes: readonly string[], itemLabel: string) {
+  return multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: maxSize, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      if ((allowedMimeTypes as readonly string[]).includes(file.mimetype)) {
+        cb(null, true);
+        return;
+      }
+      cb(
+        new BadRequestError(
+          `Tipo de archivo no permitido '${file.mimetype}'. Solo PNG, JPG, JPEG o SVG`,
+        ),
+      );
+    },
+  });
+}
+
+export const companyLogoUpload = createUploadMiddleware(MAX_LOGO_SIZE_BYTES, ALLOWED_LOGO_MIME_TYPES, "logotipo");
+export const companySignatureUpload = createUploadMiddleware(
+  MAX_SIGNATURE_SIZE_BYTES,
+  ALLOWED_SIGNATURE_MIME_TYPES,
+  "firma",
+);
+
+export const handleLogoUploadError = createUploadErrorHandler("logo");
+export const handleSignatureUploadError = createUploadErrorHandler("signature");
+
+export async function uploadCompanyLogoToStorage(file: Express.Multer.File): Promise<{
+  logoUrl: string;
+  logoPath: string;
+}> {
+  const result = await uploadAssetToStorage("logo", file);
+  return { logoUrl: result.url, logoPath: result.path };
 }
 
 export async function removeCompanyLogoFromStorage(logoPath: string | null | undefined): Promise<void> {
-  if (!logoPath) return;
-  const supabase = getSupabaseClient();
-  const { bucket } = getStorageConfig();
-  const { error } = await supabase.storage.from(bucket).remove([logoPath]);
-  if (error) {
-    throw new BadRequestError(`No se pudo eliminar el logotipo anterior: ${error.message}`);
-  }
+  await removeAssetFromStorage("logo", logoPath);
+}
+
+export async function uploadCompanySignatureToStorage(file: Express.Multer.File): Promise<{
+  signatureUrl: string;
+  signaturePath: string;
+}> {
+  const result = await uploadAssetToStorage("signature", file);
+  return { signatureUrl: result.url, signaturePath: result.path };
+}
+
+export async function removeCompanySignatureFromStorage(signaturePath: string | null | undefined): Promise<void> {
+  await removeAssetFromStorage("signature", signaturePath);
 }

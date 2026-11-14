@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { BadRequestError } from "../../shared/http-error.js";
 import { updateCompanySettingsSchema } from "./company-settings.dto.js";
-import { clearCompanyLogo, getCompanySettings, updateCompanyLogo, updateCompanySettings, } from "./company-settings.service.js";
-import { companyLogoUpload, handleLogoUploadError, removeCompanyLogoFromStorage, uploadCompanyLogoToStorage, } from "./company-settings.storage.js";
+import { clearCompanyLogo, clearCompanySignature, getCompanySettings, updateCompanyLogo, updateCompanySettings, updateCompanySignature, } from "./company-settings.service.js";
+import { companyLogoUpload, companySignatureUpload, handleLogoUploadError, handleSignatureUploadError, removeCompanyLogoFromStorage, removeCompanySignatureFromStorage, uploadCompanyLogoToStorage, uploadCompanySignatureToStorage, } from "./company-settings.storage.js";
 export const companySettingsRouter = Router();
 companySettingsRouter.get("/", async (_req, res) => {
     res.json(await getCompanySettings());
@@ -42,6 +42,42 @@ companySettingsRouter.delete("/logo", async (req, res, next) => {
             await removeCompanyLogoFromStorage(current.logoPath);
         }
         res.json(await clearCompanyLogo(req.user?.id));
+    }
+    catch (error) {
+        next(error);
+    }
+});
+companySettingsRouter.post("/signature", companySignatureUpload.single("signature"), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            throw new BadRequestError("Debe adjuntar un archivo de firma en el campo 'signature'");
+        }
+        const current = await getCompanySettings();
+        const uploaded = await uploadCompanySignatureToStorage(req.file);
+        try {
+            const updated = await updateCompanySignature(uploaded, req.user?.id);
+            if (current.signaturePath && current.signaturePath !== uploaded.signaturePath) {
+                await removeCompanySignatureFromStorage(current.signaturePath);
+            }
+            res.json(updated);
+        }
+        catch (error) {
+            // Si falla la persistencia en BD, evita dejar huérfano el archivo subido
+            await removeCompanySignatureFromStorage(uploaded.signaturePath).catch(() => undefined);
+            throw error;
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+}, handleSignatureUploadError);
+companySettingsRouter.delete("/signature", async (req, res, next) => {
+    try {
+        const current = await getCompanySettings();
+        if (current.signaturePath) {
+            await removeCompanySignatureFromStorage(current.signaturePath);
+        }
+        res.json(await clearCompanySignature(req.user?.id));
     }
     catch (error) {
         next(error);

@@ -12,6 +12,8 @@ const INITIAL_COMPANY_SETTINGS = {
   legalName: null,
   logoUrl: null,
   logoPath: null,
+  signatureUrl: null,
+  signaturePath: null,
   responsibleName: "Ricardo Gabriel Lillo Morales",
   responsiblePosition: "Socio Gerente",
   address: "Martín Güemes 944",
@@ -32,6 +34,8 @@ type CompanySettingsRecord = {
   legalName: string | null;
   logoUrl: string | null;
   logoPath: string | null;
+  signatureUrl: string | null;
+  signaturePath: string | null;
   responsibleName: string | null;
   responsiblePosition: string | null;
   address: string | null;
@@ -56,6 +60,8 @@ function serializeCompanySettings(settings: CompanySettingsRecord) {
     legalName: settings.legalName,
     logoUrl: settings.logoUrl,
     logoPath: settings.logoPath,
+    signatureUrl: settings.signatureUrl,
+    signaturePath: settings.signaturePath,
     responsibleName: settings.responsibleName,
     responsiblePosition: settings.responsiblePosition,
     address: settings.address,
@@ -157,6 +163,43 @@ export async function clearCompanyLogo(userId?: number) {
   });
 
   await writeAuditLog(userId, "company_settings.logo.delete");
+
+  return serializeCompanySettings(settings);
+}
+
+export async function updateCompanySignature(
+  signature: { signatureUrl: string; signaturePath: string | null },
+  userId?: number,
+) {
+  await ensureCompanySettings();
+  const settings = await prisma.companySettings.update({
+    where: { id: COMPANY_SETTINGS_ID },
+    data: {
+      signatureUrl: signature.signatureUrl,
+      signaturePath: signature.signaturePath,
+      updatedBy: userId ?? null,
+    },
+  });
+
+  await writeAuditLog(userId, "company_settings.signature.update", {
+    signatureUrl: signature.signatureUrl,
+  });
+
+  return serializeCompanySettings(settings);
+}
+
+export async function clearCompanySignature(userId?: number) {
+  await ensureCompanySettings();
+  const settings = await prisma.companySettings.update({
+    where: { id: COMPANY_SETTINGS_ID },
+    data: {
+      signatureUrl: null,
+      signaturePath: null,
+      updatedBy: userId ?? null,
+    },
+  });
+
+  await writeAuditLog(userId, "company_settings.signature.delete");
 
   return serializeCompanySettings(settings);
 }
