@@ -13,37 +13,46 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 describe("POST /api/auth/login", () => {
-    it("con credenciales válidas → 200, cookie seteada y usuario en body", async () => {
-        await createTestUser({ email: "admin@clickear.local", password: "Admin123!" });
+    it("con credenciales válidas → 200, cookie seteada y usuario con rol en body", async () => {
+        await createTestUser({ username: "admin", password: "Admin123!", role: "ADMIN" });
         const res = await supertest(app).post("/api/auth/login").send({
-            email: "admin@clickear.local",
+            username: "admin",
             password: "Admin123!",
         });
         expect(res.status).toBe(200);
-        expect(res.body.user.email).toBe("admin@clickear.local");
+        expect(res.body.user.username).toBe("admin");
+        expect(res.body.user.role).toBe("ADMIN");
         expect(res.headers["set-cookie"]).toBeDefined();
         expect(res.headers["set-cookie"][0]).toContain("auth_token=");
     });
-    it("con credenciales inválidas → 401", async () => {
-        await createTestUser({ email: "admin@clickear.local", password: "Admin123!" });
+    it("normaliza el username a minúsculas", async () => {
+        await createTestUser({ username: "admin", password: "Admin123!" });
         const res = await supertest(app).post("/api/auth/login").send({
-            email: "admin@clickear.local",
+            username: "Admin",
+            password: "Admin123!",
+        });
+        expect(res.status).toBe(200);
+    });
+    it("con credenciales inválidas → 401", async () => {
+        await createTestUser({ username: "admin", password: "Admin123!" });
+        const res = await supertest(app).post("/api/auth/login").send({
+            username: "admin",
             password: "WrongPass123!",
         });
         expect(res.status).toBe(401);
         expect(res.body.error).toBe("Credenciales incorrectas");
     });
-    it("con email inexistente → 401", async () => {
+    it("con username inexistente → 401", async () => {
         const res = await supertest(app).post("/api/auth/login").send({
-            email: "noexiste@clickear.local",
+            username: "noexiste",
             password: "Admin123!",
         });
         expect(res.status).toBe(401);
     });
     it("con body inválido (Zod) → 400 con detalles de validación", async () => {
         const res = await supertest(app).post("/api/auth/login").send({
-            email: "no-es-un-email",
-            password: "corta",
+            username: "no",
+            password: "",
         });
         expect(res.status).toBe(400);
         expect(res.body.error).toBe("Datos invalidos");
@@ -63,17 +72,35 @@ describe("POST /api/auth/logout", () => {
     });
 });
 describe("GET /api/auth/me", () => {
-    it("con cookie válida → 200 y usuario", async () => {
+    it("con cookie válida → 200 y usuario con rol y permisos", async () => {
         const user = await createTestUser({
-            email: "me@clickear.local",
+            username: "meuser",
             password: "MePass123!",
+            role: "REVISADOR",
+            permissions: [{ feature: "tickets", access: "VIEW" }],
         });
         const res = await supertest(app)
             .get("/api/auth/me")
             .set("Cookie", authCookie(user));
         expect(res.status).toBe(200);
-        expect(res.body.user.email).toBe(user.email);
+        expect(res.body.user.username).toBe(user.username);
         expect(res.body.user.name).toBe(user.name);
+        expect(res.body.user.role).toBe("REVISADOR");
+        expect(res.body.user.permissions).toEqual([{ feature: "tickets", access: "VIEW" }]);
+    });
+    it("usuario sin funcionalidades asignadas → login rechazado", async () => {
+        await createTestUser({
+            username: "sinpermisos",
+            password: "SinPermisos123!",
+            role: "GESTOR",
+            permissions: [],
+        });
+        const res = await supertest(app).post("/api/auth/login").send({
+            username: "sinpermisos",
+            password: "SinPermisos123!",
+        });
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain("funcionalidades");
     });
     it("sin cookie → 401", async () => {
         const res = await supertest(app).get("/api/auth/me");

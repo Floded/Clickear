@@ -14,6 +14,7 @@ authRouter.post("/logout", (_req, res) => {
     res.clearCookie(COOKIE_NAME, clearOptions).json({ ok: true });
 });
 authRouter.get("/me", authenticate, (req, res) => {
+    // req.user ya trae permisos frescos desde la BD
     res.json({ user: toSessionUser(req.user) });
 });
 //# sourceMappingURL=auth.routes.js.map

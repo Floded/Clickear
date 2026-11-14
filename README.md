@@ -62,7 +62,7 @@ Reglas:
 - `dotenv` **nunca pisa variables ya existentes**: en Render siempre ganan las del dashboard.
 - Los archivos `.env` y `.env.production` están en `.gitignore` (suben los secretos solo por el dashboard).
 - Tras editar un `.env`, **reiniciar el servidor**: `tsx watch` no detecta cambios en `.env`.
-- Seed del admin local: `npm run db:seed` → `admin@clickear.local` / `Admin123!` (solo local).
+- Seed del admin local: `npm run db:seed` (usuario `admin` por defecto; ver variables `ADMIN_*` en `.env`, solo local). - Autenticación por **username + contraseña** (JWT en cookie httpOnly). Usuarios con roles (`ADMIN`, `GESTOR`, `REVISADOR`) y permisos por funcionalidad (`VIEW`/`EDIT`) para `tickets`, `organization`, `inventory`, `budgets`, `invoices`. `ADMIN` tiene acceso total implícito; las rutas exigen el permiso requerido. Gestión de usuarios vía `/api/users` (solo ADMIN).
 
 ```bash
 # Probar el backend en modo producción en tu máquina

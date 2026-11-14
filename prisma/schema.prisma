@@ -20,7 +20,8 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp()
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
 
-  permissions UserPermission[]
+  permissions              UserPermission[]
+  updatedCompanySettings   CompanySettings[] @relation("CompanySettingsUpdatedBy")
 
   @@map("users")
 }
@@ -294,4 +295,39 @@ model AuditLog {
   timestamp  DateTime @default(now()) @map("timestamp") @db.Timestamp()
 
   @@map("audit_logs")
+}
+
+// ==========================================
+// CONFIGURACIÓN DE EMPRESA
+// ==========================================
+
+model CompanySettings {
+  id                  Int      @id @default(1)
+  commercialName      String?  @map("commercial_name") @db.VarChar(255)
+  legalName           String?  @map("legal_name") @db.VarChar(255)
+  logoUrl             String?  @map("logo_url") @db.Text
+  logoPath            String?  @map("logo_path") @db.Text
+
+  responsibleName     String?  @map("responsible_name") @db.VarChar(255)
+  responsiblePosition String?  @map("responsible_position") @db.VarChar(255)
+
+  address             String?  @db.Text
+  locality            String?  @db.VarChar(100)
+  province            String?  @db.VarChar(100)
+  country             String?  @db.VarChar(100)
+  postalCode          String?  @map("postal_code") @db.VarChar(20)
+  email               String?  @db.VarChar(255)
+  phone               String?  @db.VarChar(50)
+
+  taxId               String?  @map("tax_id") @db.VarChar(20)
+  grossIncomeNumber   String?  @map("gross_income_number") @db.VarChar(50)
+  rupeNumber          String?  @map("rupe_number") @db.VarChar(50)
+
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  updatedBy           Int?     @map("updated_by")
+
+  updatedByUser       User?    @relation("CompanySettingsUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@map("company_settings")
 }

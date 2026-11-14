@@ -16,8 +16,14 @@ export function signSession(payload) {
 export function verifySession(token) {
     return jwt.verify(token, getSecret());
 }
-export function toSessionUser(payload) {
-    return { id: Number(payload.sub), email: payload.email, name: payload.name };
+export function toSessionUser(user) {
+    return {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        permissions: user.permissions,
+    };
 }
 export const sessionCookieOptions = {
     httpOnly: true,
@@ -31,7 +37,7 @@ export async function logAuthAttempt(req, token, success = false, errorCode) {
     try {
         await prisma.auditLog.create({
             data: {
-                userId: req.user?.sub ? Number(req.user.sub) : null,
+                userId: req.user?.id ?? null,
                 action: success ? "login_success" : "login_failure",
                 resource: "auth",
                 details: {

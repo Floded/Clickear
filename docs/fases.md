@@ -63,6 +63,7 @@ Implementado por completo en el repo `Frontend/` (ver su
 - Facturación: tabla de comprobantes con badges de estado (emisión real pendiente).
 - **Proveedores**: alta y listado en `/inventory/suppliers` con búsqueda y
   paginación; hover card con teléfono/email/web desde el tab de stock.
+- **Usuarios y permisos**: gestión de usuarios (solo ADMIN), permisos por funcionalidad `VIEW`/`EDIT`, acciones masivas "Todo en lectura"/"Todo en edición" y UI en solo lectura que oculta acciones de modificación (p. ej. en tickets). Visor de imágenes de cierre en modal proporcionado a la pantalla.
 
 ---
 
